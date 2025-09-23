@@ -1,0 +1,1 @@
+int p_servo1 = 0;
