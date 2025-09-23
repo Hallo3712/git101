@@ -1,0 +1,13 @@
+{
+  "information_title": "Information",
+  "app_version": "App Version: {}",
+  "switch_language": "Switch Language",
+  "home_title": "Home Page",
+  "counter_prompt": "You have pushed the button this many times:",
+  "input_label": "Enter amount",
+  "incremented_by": "Increased by {}",
+  "decremented_by": "Decreased by {}",
+  "history_title": "History",
+  "increment": "Increment",
+  "decrement": "Decrement"
+}

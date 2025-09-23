@@ -1,0 +1,13 @@
+{
+  "information_title": "ข้อมูล",
+  "app_version": "เวอร์ชันแอพ: {}",
+  "switch_language": "เปลี่ยนภาษา",
+  "home_title": "หน้าหลัก",
+  "counter_prompt": "คุณได้กดปุ่มแล้วจำนวน:",
+  "input_label": "กรอกจำนวน",
+  "incremented_by": "เพิ่มขึ้น {}",
+  "decremented_by": "ลดลง {}",
+  "history_title": "ประวัติ",
+  "increment": "เพิ่ม",
+  "decrement": "ลด"
+}

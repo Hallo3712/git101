@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Video Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        .controls button {
+            font-size: 16px;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Video Tracker</h1>
+    <p>Upload a video and click 'Set ROI' to define a tracking area.</p>
+
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" name="video" accept="video/*">
+        <button type="submit">Upload Video</button>
+    </form>
+
+    <img id="video-feed" src="{{ url_for('video_feed') }}" width="640" height="480"
+        style="border: 1px solid black; margin-top: 20px;">
+
+    <div class="controls">
+        <button onclick="sendCommand('play')">Play</button>
+        <button onclick="sendCommand('pause')">Pause</button>
+        <button onclick="sendCommand('seek_backward')">Backward 10s</button>
+        <button onclick="sendCommand('seek_forward')">Forward 10s</button>
+        <button onclick="sendCommand('set_roi')">Set ROI (Default)</button>
+        <button onclick="sendCommand('toggle_tracking')">Toggle Tracking</button>
+    </div>
+
+    <script>
+        function sendCommand(cmd) {
+            fetch('/command/' + cmd)
+                .then(response => console.log(response.status));
+        }
+
+        document.getElementById('upload-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            fetch('/upload_video', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    alert('Video uploaded successfully! Click "Set ROI" to begin.');
+                } else {
+                    alert('Upload failed.');
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

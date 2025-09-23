@@ -1,0 +1,158 @@
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include "DHT.h"
+
+// ====== WiFi & MQTT Config ======
+const char* ssid = "Test";
+const char* password = "Test987654321";
+const char* mqtt_server = "broker.netpie.io";
+const int mqtt_port = 1883;
+const char* mqtt_Client = "04a9bf82-326a-4b95-a6e7-260d3e87e7cc";
+const char* mqtt_username = "Wq7BxGDMXpa7up7Wg2WgnyCXHVBVeJY3";
+const char* mqtt_password = "EgX9tJwgv8aLVVvqB31CHuN5Aw2bMXeD";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+#define led LED_BUILTIN        // GPIO2 (Active LOW)
+#define DHTPIN D5              // GPIO14 (D5) สำหรับ DHT11
+
+// --- แก้ไข: เปลี่ยน Relay Pin เป็น D6 (GPIO12) ---
+#define RELAY_PIN D6           // GPIO12 (D6) สำหรับควบคุม Relay
+// หมายเหตุ: D6 เป็นขาที่ปลอดภัยกว่า D3 (GPIO0) สำหรับการควบคุม Relay เพราะไม่เกี่ยวข้องกับ Boot Mode
+// ตรวจสอบการต่อสาย Relay ใหม่ให้เชื่อมต่อกับขา D6 ของ NodeMCU
+// Relay ของคุณเป็น Active HIGH: HIGH เพื่อเปิด, LOW เพื่อปิด
+DHT dht;
+
+int c1 = 0; // ตัวนับรอบ
+
+// ====== MQTT reconnect ======
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection…");
+    if (client.connect(mqtt_Client, mqtt_username, mqtt_password)) {
+      Serial.println("connected");
+      // การ subscribe ซ้ำซ้อน
+      // client.subscribe("@msg/test2"); // บรรทัดนี้ไม่จำเป็นต้องมีซ้ำ
+      
+      // เพิ่มการ subscribe ซ้ำในกรณีที่หลุด และแสดงสถานะการ subscribe
+      if (client.subscribe("@msg/test2")) {
+        Serial.println("Subscribed to @msg/test2");
+      } else {
+        Serial.print("Failed to subscribe to @msg/test2, rc=");
+        Serial.println(client.state()); // แสดงรหัสข้อผิดพลาดของการ subscribe
+      }
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+// ====== Callback for incoming MQTT messages ======
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  String message;
+  for (unsigned int i = 0; i < length; i++) { // ใช้ unsigned int สำหรับ i
+    message += (char)payload[i];
+  }
+  Serial.println(message);
+
+  // === ควบคุมรีเลย์ ===
+  if (String(topic) == "@msg/test2") {
+    if (message == "on") {
+      // --- แก้ไข: สำหรับ Relay Active HIGH, ส่ง HIGH เพื่อเปิด ---
+      digitalWrite(RELAY_PIN, HIGH); 
+      Serial.println("🔔 Relay ON");
+    } else if (message == "off") {
+      // --- แก้ไข: สำหรับ Relay Active HIGH, ส่ง LOW เพื่อปิด ---
+      digitalWrite(RELAY_PIN, LOW);   
+      Serial.println("🔕 Relay OFF");
+    }
+  }
+}
+
+// ====== Setup ======
+void setup() {
+  Serial.begin(115200);
+  Serial.println("\nConnecting to WiFi...");
+
+  pinMode(led, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  // --- แก้ไข: เริ่มต้นปิดรีเลย์ (Active HIGH = LOW) ---
+  digitalWrite(RELAY_PIN, LOW); // เริ่มต้นปิดรีเลย์
+
+  // กระพริบ LED ถี่ 5 ครั้ง
+  for (int i = 0; i < 5; i++) {
+    digitalWrite(led, LOW);    // เปิดไฟ (LED_BUILTIN เป็น Active LOW)
+    delay(100);
+    digitalWrite(led, HIGH);   // ปิดไฟ (LED_BUILTIN เป็น Active LOW)
+    delay(100);
+  }
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi connected. IP address:");
+  Serial.println(WiFi.localIP());
+
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+
+  dht.setup(DHTPIN); // เริ่มใช้งาน DHT
+}
+
+// ====== Main Loop ======
+void loop() {
+  // --- เพิ่ม Serial.println เพื่อตรวจสอบสถานะ MQTT ---
+  if (!client.connected()) {
+    Serial.println("MQTT Disconnected. Reconnecting...");
+    reconnect();
+  }
+  client.loop(); // ต้องทำงานตลอดเวลาเพื่อประมวลผลข้อความ MQTT ที่เข้ามา
+
+  static unsigned long lastSendTime = 0;
+  const unsigned long sendInterval = 5000; // ส่งทุก 5 วินาที
+
+  if (millis() - lastSendTime >= sendInterval) {
+    lastSendTime = millis();
+    c1++;
+
+    float humidity = dht.getHumidity();
+    float temperature = dht.getTemperature();
+    String status = "Read";
+
+    if (isnan(humidity) || isnan(temperature)) {
+      status = "Nan";
+      Serial.println("❌ Failed to read from DHT sensor, skipping data transmission");
+
+      String data = "{\"data\" : {\"count\" :" + String(c1) + ", \"status\" : \"" + status + "\"}}";
+      Serial.println(data);
+      client.publish("@shadow/data/update", data.c_str());
+      return;
+    }
+
+    // อ่านค่าได้
+    Serial.println("✅ Read successful");
+    Serial.println("=== Sensor Readings ===");
+    Serial.print("Count: "); Serial.println(c1);
+    Serial.print("Temperature: "); Serial.print(temperature, 1); Serial.println(" °C");
+    Serial.print("Humidity: "); Serial.print(humidity, 1); Serial.println(" %");
+    Serial.print("Status: "); Serial.println(status);
+
+    String data = "{\"data\" : {\"count\" :" + String(c1) +
+                      ", \"temp\" :" + String(temperature, 1) +
+                      ", \"humidity\" :" + String(humidity, 1) +
+                      ", \"status\" : \"" + status + "\"}}";
+
+    Serial.println(data);
+    client.publish("@shadow/data/update", data.c_str());
+  }
+}

@@ -1,0 +1,307 @@
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <FirebaseESP8266.h>
+
+// กำหนดค่า Wi-Fi ของคุณ
+#define WIFI_SSID "Test"
+#define WIFI_PASSWORD "Test987654321"
+
+// กำหนดค่า Firebase ของคุณ
+#define FIREBASE_HOST "app-firebase-servo-default-rtdb.asia-southeast1.firebasedatabase.app/"
+#define FIREBASE_AUTH "ak7LKZApYAGTP5HBzClMHVHDRwyRmXP5wY6QTBPX"
+
+// สร้าง Object สำหรับ Firebase
+FirebaseData firebaseData;
+FirebaseConfig config;
+
+// ตัวแปรสำหรับเก็บสถานะปัจจุบันที่อ่านได้จาก Firebase (จาก /test/status)
+bool currentStatus = false;
+
+// ตัวแปรสำหรับควบคุมการทำงานของ LED และ Timer
+unsigned long ledOnStartTime = 0; // เก็บเวลาที่ LED ถูกเปิด
+bool isLedTimerActive = false;    // สถานะของ Timer ว่ากำลังนับถอยหลังอยู่หรือไม่
+const long LED_ON_DURATION = 10000; // ระยะเวลาที่ LED ติด (10 วินาที = 10000 มิลลิวินาที)
+unsigned long lastCountdownPrintTime = 0; // เก็บเวลาที่พิมพ์นับถอยหลังล่าสุด
+const long COUNTDOWN_PRINT_INTERVAL = 1000; // พิมพ์นับถอยหลังทุก 1 วินาที
+
+// เพิ่มตัวแปรสถานะเพื่อจัดการการอัปเดต Firebase ที่ค้างอยู่
+enum FirebaseUpdateState {
+  NO_UPDATE_NEEDED,
+  PENDING_UPDATE_TO_FALSE,
+  WAITING_FOR_FIREBASE_CONFIRMATION
+};
+FirebaseUpdateState firebaseUpdateState = NO_UPDATE_NEEDED;
+
+// เพิ่มตัวแปรสำหรับสถานะจริงของ LED (ว่าควรจะ ON หรือ OFF)
+bool isLedActuallyOn = false; // สถานะจริงของ LED Built-in (true = ON, false = OFF)
+
+// เพิ่มตัวแปรสำหรับควบคุมการเชื่อมต่อ Wi-Fi ด้วยคำสั่ง "test"
+bool isTestModeActive = false; // สถานะที่บอกว่ากำลังอยู่ในโหมดทดสอบด้วยคำสั่ง "test"
+unsigned long testModeStartTime = 0; // เวลาที่เริ่มโหมดทดสอบ
+
+// Function Prototype (ประกาศฟังก์ชันล่วงหน้า)
+void connectWifi();
+void setLedState(bool state); // ฟังก์ชันใหม่สำหรับควบคุม LED
+void disconnectWifi(); // ฟังก์ชันสำหรับตัดการเชื่อมต่อ Wi-Fi
+void handleSerialInput(); // ฟังก์ชันจัดการ Serial Input
+void handleLedTimer(); // ฟังก์ชันจัดการ LED Timer
+void handleFirebaseOperations(); // ฟังก์ชันจัดการ Firebase Read/Write
+
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  setLedState(false); // ตั้งค่าเริ่มต้นให้ LED ปิด
+
+  connectWifi(); // เชื่อมต่อ Wi-Fi
+
+  config.database_url = FIREBASE_HOST;
+  config.signer.tokens.legacy_token = FIREBASE_AUTH;
+  Firebase.begin(&config, NULL);
+  Firebase.reconnectWiFi(true);
+
+  Serial.println("Firebase initialized. Ready to read data from Firebase.");
+  Serial.println("Waiting for changes at /test/status ...");
+  Serial.println("Type 'on' in Serial Monitor to turn LED ON."); // *** เพิ่ม: คำแนะนำสำหรับคำสั่ง 'on' ***
+  Serial.println("Type 'off' in Serial Monitor to turn LED OFF."); // *** เพิ่ม: คำแนะนำสำหรับคำสั่ง 'off' ***
+  Serial.println("Type 'disconnect' in Serial Monitor to disconnect WiFi.");
+  Serial.println("Type 'reconnect' in Serial Monitor to force reconnect WiFi.");
+  Serial.println("Type 'test' in Serial Monitor to turn LED ON for 10s and disconnect WiFi.");
+
+  // อ่านค่าเริ่มต้นจาก Firebase หนึ่งครั้งเมื่อเริ่มต้น
+  if (Firebase.getBool(firebaseData, "/test/status")) {
+    if (firebaseData.dataType() == "boolean") {
+      currentStatus = firebaseData.boolData();
+      Serial.print("Initial value of /test/status: ");
+      Serial.println(currentStatus ? "TRUE" : "FALSE");
+      setLedState(currentStatus);
+      if (currentStatus) {
+        ledOnStartTime = millis();
+        isLedTimerActive = true;
+        lastCountdownPrintTime = millis();
+        Serial.println("LED ON. Timer started for 10 seconds.");
+        Serial.print("Time remaining: ");
+        Serial.println(LED_ON_DURATION / 1000);
+      }
+    } else {
+      Serial.print("Initial value of /test/status is not boolean. Data type: ");
+      Serial.println(firebaseData.dataType());
+    }
+  } else {
+    Serial.println("Failed to read initial value of /test/status.");
+  }
+}
+
+void loop() {
+  handleSerialInput(); // จัดการคำสั่งจาก Serial Input ตลอดเวลา
+  handleLedTimer();   // จัดการ Timer ของ LED ตลอดเวลา
+  handleFirebaseOperations(); // จัดการการอ่าน/เขียน Firebase (เมื่อ WiFi พร้อม)
+
+  delay(10);
+}
+
+// *** ฟังก์ชันสำหรับจัดการ Serial Input ***
+void handleSerialInput() {
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+
+    if (command == "on") { // *** เพิ่ม: คำสั่ง 'on' ***
+      Serial.println("Received 'on' command. Turning LED ON.");
+      setLedState(true); // เปิด LED
+      ledOnStartTime = millis(); // เริ่มจับเวลา (เผื่อจะอยากใช้ timer ร่วมด้วย)
+      isLedTimerActive = true;   // เปิดใช้งาน Timer
+      lastCountdownPrintTime = millis();
+      // เมื่อสั่ง ON ด้วยมือ, จะยกเลิกโหมด test และการอัปเดต Firebase อัตโนมัติ
+      isTestModeActive = false;
+      firebaseUpdateState = NO_UPDATE_NEEDED;
+      Serial.println("LED is ON. Timer started for 10 seconds."); // แจ้งให้ทราบว่าเริ่ม Timer ด้วย
+    } else if (command == "off") { // *** เพิ่ม: คำสั่ง 'off' ***
+      Serial.println("Received 'off' command. Turning LED OFF.");
+      setLedState(false); // ปิด LED
+      isLedTimerActive = false; // ปิด Timer
+      // เมื่อสั่ง OFF ด้วยมือ, จะยกเลิกโหมด test และการอัปเดต Firebase อัตโนมัติ
+      isTestModeActive = false;
+      firebaseUpdateState = NO_UPDATE_NEEDED;
+      Serial.println("LED is OFF. Timer stopped.");
+    } else if (command == "disconnect") {
+      Serial.println("Received 'disconnect' command.");
+      disconnectWifi();
+      isTestModeActive = false;
+      firebaseUpdateState = NO_UPDATE_NEEDED;
+    } else if (command == "reconnect") {
+      Serial.println("Received 'reconnect' command. Attempting to reconnect WiFi...");
+      connectWifi();
+      isTestModeActive = false;
+      firebaseUpdateState = NO_UPDATE_NEEDED;
+    } else if (command == "test") {
+      Serial.println("Received 'test' command. Starting 10-second LED ON and WiFi disconnect.");
+      setLedState(true); // เปิด LED
+      ledOnStartTime = millis(); // เริ่มจับเวลา LED
+      isLedTimerActive = true;   // เปิดใช้งาน Timer
+      lastCountdownPrintTime = millis(); // รีเซ็ตเวลาสำหรับพิมพ์นับถอยหลัง
+      disconnectWifi(); // ตัดการเชื่อมต่อ Wi-Fi ทันที
+      isTestModeActive = true; // ตั้งค่า Flag ว่ากำลังอยู่ในโหมดทดสอบ
+      testModeStartTime = millis(); // บันทึกเวลาที่เริ่มโหมดทดสอบ
+      firebaseUpdateState = NO_UPDATE_NEEDED; // รีเซ็ตสถานะอัปเดต Firebase
+    } else {
+      Serial.print("Unknown command: ");
+      Serial.println(command);
+    }
+  }
+}
+
+// *** ฟังก์ชันสำหรับจัดการ Timer ของ LED ***
+void handleLedTimer() {
+  if (isLedTimerActive) {
+    long elapsedTime = millis() - ledOnStartTime;
+    long remainingTime = LED_ON_DURATION - elapsedTime;
+
+    if (remainingTime > 0 && (millis() - lastCountdownPrintTime >= COUNTDOWN_PRINT_INTERVAL)) {
+      lastCountdownPrintTime = millis();
+      Serial.print("Time remaining (LED ON): ");
+      Serial.println(remainingTime / 1000 + 1);
+    }
+
+    if (elapsedTime >= LED_ON_DURATION) {
+      setLedState(false); // ปิด LED
+      isLedTimerActive = false;         // ปิดใช้งาน Timer
+      currentStatus = false;            // อัปเดตสถานะในบอร์ดให้เป็น FALSE
+
+      Serial.println("10 seconds passed. LED OFF.");
+
+      // เมื่อ LED ดับ ให้เข้าสู่สถานะที่ต้องอัปเดต Firebase เป็น FALSE
+      firebaseUpdateState = PENDING_UPDATE_TO_FALSE;
+      if (isTestModeActive) { // ถ้าอยู่ในโหมดทดสอบ
+        Serial.println("Test mode complete. Initiating WiFi reconnect and Firebase update to FALSE.");
+        connectWifi(); // เชื่อมต่อ Wi-Fi ใหม่ (เผื่อกรณีถูกตัดจากการสั่ง 'test')
+        isTestModeActive = false; // ปิดโหมดทดสอบ
+      }
+    }
+  }
+}
+
+// *** ฟังก์ชันสำหรับจัดการ Firebase Read/Write ***
+void handleFirebaseOperations() {
+  // ตรวจสอบสถานะ Wi-Fi ก่อน
+  if (WiFi.status() != WL_CONNECTED) {
+    if (!isTestModeActive || (isTestModeActive && (millis() - testModeStartTime > LED_ON_DURATION + 500))) {
+        Serial.println("WiFi Disconnected. Waiting for reconnection...");
+    }
+    return; // ออกจากฟังก์ชันนี้ ถ้าไม่มี WiFi จะทำ Firebase ไม่ได้
+  }
+
+  // ถ้า WiFi Connected แต่ Firebase ยังไม่พร้อม
+  if (!Firebase.ready()) {
+    Serial.println("Firebase not ready. Please wait for Firebase connection.");
+    return;
+  }
+
+  // *** ส่วนของการจัดการการอัปเดต Firebase เป็น FALSE หลัง LED ดับ ***
+  if (firebaseUpdateState == PENDING_UPDATE_TO_FALSE) {
+    Serial.println("Attempting to update Firebase '/test/status' to FALSE...");
+    if (Firebase.setBool(firebaseData, "/test/status", false)) {
+      Serial.println("Firebase '/test/status' updated to FALSE successfully. Now confirming...");
+      firebaseUpdateState = WAITING_FOR_FIREBASE_CONFIRMATION; // ไปรอการยืนยัน
+    } else {
+      Serial.println("Error updating Firebase '/test/status' to FALSE: " + firebaseData.errorReason());
+    }
+  }
+
+  // *** ส่วนของการอ่านค่าจาก Firebase (รวมถึงการยืนยันหลังจากอัปเดต) ***
+  // โค้ดส่วนนี้จะถูกข้ามเมื่ออยู่ในโหมดทดสอบ เพื่อให้คำสั่ง test ควบคุมอย่างเดียว
+  if (!isTestModeActive) {
+    if (Firebase.getBool(firebaseData, "/test/status")) {
+      if (firebaseData.dataType() == "boolean") {
+        bool firebaseValue = firebaseData.boolData();
+
+        // ถ้าค่าที่อ่านได้จาก Firebase แตกต่างจากค่าที่เก็บไว้ในบอร์ด
+        // หรือถ้าเรากำลังรอการยืนยันว่า Firebase เป็น FALSE แล้ว
+        if (firebaseValue != currentStatus || firebaseUpdateState == WAITING_FOR_FIREBASE_CONFIRMATION) {
+          currentStatus = firebaseValue; // อัปเดตค่าที่เก็บไว้ในบอร์ด
+          Serial.print("Firebase '/test/status' changed to: ");
+          Serial.println(currentStatus ? "TRUE" : "FALSE");
+
+          // หาก Firebase เป็น FALSE และเรากำลังรอการยืนยัน
+          if (!currentStatus && firebaseUpdateState == WAITING_FOR_FIREBASE_CONFIRMATION) {
+            Serial.println("Firebase confirmation received: '/test/status' is now FALSE.");
+            firebaseUpdateState = NO_UPDATE_NEEDED; // อัปเดตสำเร็จและยืนยันแล้ว
+          }
+
+          // ควบคุม LED Built-in ตามค่าที่อ่านได้จาก Firebase
+          if (currentStatus) { // ถ้า currentStatus เป็น TRUE (LED ควรจะติด)
+            // ตรวจสอบว่า LED ไม่ได้กำลังติดอยู่แล้ว (ป้องกันการรีเซ็ต Timer ซ้ำ)
+            if (!isLedTimerActive || !isLedActuallyOn) { // เพิ่มเงื่อนไข isLedActuallyOn เพื่อให้แน่ใจว่า LED ยังไม่ติดจริง ๆ
+              setLedState(true); // เปิด LED
+              ledOnStartTime = millis(); // เริ่มจับเวลา
+              isLedTimerActive = true;   // เปิดใช้งาน Timer
+              lastCountdownPrintTime = millis();
+              Serial.println("LED ON. Timer started for 10 seconds (from Firebase command).");
+              Serial.print("Time remaining: ");
+              Serial.println(LED_ON_DURATION / 1000);
+            }
+          } else { // ถ้า currentStatus เป็น FALSE (LED ควรจะดับ)
+            setLedState(false); // ปิด LED
+            isLedTimerActive = false; // ปิดใช้งาน Timer ถ้ามีการสั่งปิดก่อนครบเวลา
+            Serial.println("LED OFF. Timer reset (from Firebase command).");
+            // ถ้า Firebase สั่ง FALSE โดยตรงและเราไม่ได้อยู่ในสถานะรออัปเดตจาก Timer, ก็ให้รีเซ็ตสถานะอัปเดต
+            if (firebaseUpdateState != PENDING_UPDATE_TO_FALSE && firebaseUpdateState != WAITING_FOR_FIREBASE_CONFIRMATION) {
+                firebaseUpdateState = NO_UPDATE_NEEDED;
+            }
+          }
+        }
+      } else {
+        Serial.print("Firebase '/test/status' is not a boolean type. Data type: ");
+        Serial.println(firebaseData.dataType());
+      }
+    } else {
+      // Serial.println("Failed to read '/test/status': " + firebaseData.errorReason());
+    }
+  }
+}
+
+// ฟังก์ชันสำหรับเชื่อมต่อ Wi-Fi
+void connectWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Already connected to WiFi.");
+    Serial.print("Current IP Address: ");
+    Serial.println(WiFi.localIP());
+    return;
+  }
+  Serial.print("Connecting to WiFi...");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  unsigned long startTime = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+    if (millis() - startTime > 30000) { // Timeout 30 วินาที
+        Serial.println("\nWiFi connection timed out.");
+        return;
+    }
+  }
+  Serial.println("\nConnected to WiFi");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+}
+
+// ฟังก์ชันใหม่สำหรับควบคุม LED Built-in
+void setLedState(bool state) {
+  if (state) { // ถ้าต้องการเปิด LED
+    digitalWrite(LED_BUILTIN, LOW); // Active LOW: LOW = ON
+    isLedActuallyOn = true;
+  } else { // ถ้าต้องการปิด LED
+    digitalWrite(LED_BUILTIN, HIGH); // Active LOW: HIGH = OFF
+    isLedActuallyOn = false;
+  }
+}
+
+// ฟังก์ชันสำหรับตัดการเชื่อมต่อ Wi-Fi
+void disconnectWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.disconnect();
+    Serial.println("WiFi disconnected manually.");
+  } else {
+    Serial.println("WiFi is already disconnected.");
+  }
+}

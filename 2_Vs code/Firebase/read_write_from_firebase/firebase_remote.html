@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Relay Control</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            /* Makes buttons wrap to the next line on smaller screens */
+            justify-content: center;
+            gap: 20px;
+            /* Spacing between buttons */
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-width: 180px;
+            /* Minimum width for buttons */
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Styles for individual buttons with different colors */
+        #btn10sec {
+            background-color: #4CAF50;
+            /* Green */
+            color: white;
+        }
+
+        #btn10sec:hover {
+            background-color: #45a049;
+        }
+
+        #btn1min {
+            background-color: #2196F3;
+            /* Blue */
+            color: white;
+        }
+
+        #btn1min:hover {
+            background-color: #0b7dda;
+        }
+
+        #btnIndefinite {
+            background-color: #FFC107;
+            /* Amber */
+            color: #333;
+        }
+
+        #btnIndefinite:hover {
+            background-color: #e0a800;
+        }
+
+        #btnNon {
+            background-color: #f44336;
+            /* Red */
+            color: white;
+        }
+
+        #btnNon:hover {
+            background-color: #da190b;
+        }
+
+        #statusMessage {
+            margin-top: 30px;
+            font-size: 1.1em;
+            color: #555;
+        }
+
+        /* Additional CSS for device status display */
+        .status-display-container {
+            margin-top: 40px;
+            padding: 25px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: left;
+            /* Align text inside div to the left */
+        }
+
+        .status-display-container h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .status-display-container p {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            display: flex;
+            /* Use flexbox for label and value alignment */
+            justify-content: space-between;
+            /* Distribute space between label and value */
+            align-items: center;
+        }
+
+        .status-display-container span {
+            font-weight: bold;
+        }
+
+        /* Online/Offline status colors */
+        .online {
+            color: #4CAF50;
+            /* Green */
+        }
+
+        .offline {
+            color: #f44336;
+            /* Red */
+        }
+
+        .unknown {
+            color: #FFC107;
+            /* Amber */
+        }
+
+        .on {
+            color: #4CAF50;
+            /* Green */
+        }
+
+        .off {
+            color: #f44336;
+            /* Red */
+        }
+    </style>
+</head>
+
+<body>
+    <h1>ควบคุม Relay ผ่าน Firebase</h1>
+    <div class="button-container">
+        <button id="btn10sec">เปิด 10 วินาที</button>
+        <button id="btn1min">เปิด 1 นาที</button>
+        <button id="btnIndefinite">เปิดตลอดไป</button>
+        <button id="btnNon">ปิด / ว่าง</button>
+    </div>
+
+    <p id="statusMessage">สถานะ: รอคำสั่ง...</p>
+
+    <div class="status-display-container">
+        <h2>สถานะอุปกรณ์</h2>
+        <p>สถานะ Relay: <span id="relayStatus">กำลังโหลด...</span></p>
+        <p>สถานะอุปกรณ์: <span id="deviceOnlineStatus">กำลังโหลด...</span></p>
+        <p>เปิด-ปิด (10 วินาที): <span id="button1Status">กำลังโหลด...</span></p>
+    </div>
+
+    <script>
+        // *** สำคัญมาก: แทนที่ YOUR_... ด้วยค่า Firebase Config ของคุณเอง ***
+        // ที่คุณคัดลอกมาจาก Firebase Console
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5af7N99BENR54M5F3TtaekoVYN-TMRc0",
+            authDomain: "app-firebase-servo.firebaseapp.com",
+            databaseURL: "https://app-firebase-servo-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "app-firebase-servo",
+            storageBucket: "app-firebase-servo.firebasestorage.app",
+            messagingSenderId: "317764258286",
+            appId: "1:317764258286:web:eace78c0d5ee3ab9fde6ff"
+        };
+
+        // เริ่มต้น Firebase และอ้างอิงถึงฐานข้อมูล
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // --- อ้างอิงถึง Path ต่างๆ ใน Firebase Realtime Database ---
+        const firebaseButton1Ref = database.ref('test/button1');
+        const firebasePassRef = database.ref('test/pass');
+        const firebaseOnlineStatusRef = database.ref('test/last_seen');
+
+        // --- อ้างอิงถึง Element ใน HTML ---
+        const statusMessageElem = document.getElementById('statusMessage');
+        const relayStatusElem = document.getElementById('relayStatus');
+        const deviceOnlineStatusElem = document.getElementById('deviceOnlineStatus');
+        const button1StatusElem = document.getElementById('button1Status');
+
+        const btn10sec = document.getElementById('btn10sec');
+        const btn1min = document.getElementById('btn1min');
+        const btnIndefinite = document.getElementById('btnIndefinite');
+        const btnNon = document.getElementById('btnNon');
+
+        // --- ฟังก์ชันสำหรับส่งคำสั่งไป Firebase ---
+        function sendFirebaseCommand(path, value, message) {
+            statusMessageElem.textContent = `ส่งคำสั่ง: ${message}...`;
+            database.ref(path).set(value)
+                .then(() => {
+                    statusMessageElem.textContent = `ส่งคำสั่ง ${message} สำเร็จ!`;
+                    console.log(`Successfully sent ${value} to ${path}`);
+                })
+                .catch((error) => {
+                    statusMessageElem.textContent = `ส่งคำสั่ง ${message} ล้มเหลว: ${error.message}`;
+                    console.error(`Error sending ${value} to ${path}:`, error);
+                });
+        }
+
+        // --- Event Listeners สำหรับปุ่มต่างๆ (ควบคุม) ---
+        btn10sec.addEventListener('click', () => {
+            sendFirebaseCommand('test/pass', 'reset_10_sec', 'เปิด 10 วินาที');
+        });
+
+        btn1min.addEventListener('click', () => {
+            sendFirebaseCommand('test/pass', 'reset_1_minute', 'เปิด 1 นาที');
+        });
+
+        btnIndefinite.addEventListener('click', () => {
+            sendFirebaseCommand('test/pass', 'turn_off', 'เปิดตลอดไป'); // 'turn_off' คือ ON ตลอดไป ตามโค้ด C++
+        });
+
+        btnNon.addEventListener('click', () => {
+            sendFirebaseCommand('test/pass', 'non', 'ปิด / ว่าง');
+        });
+
+        // --- Real-time Listeners สำหรับการแสดงสถานะ (อ่าน) ---
+
+        // Listener สำหรับ /test/button1
+        firebaseButton1Ref.on('value', (snapshot) => {
+            const isButton1Active = snapshot.val();
+            if (isButton1Active === true) {
+                button1StatusElem.textContent = 'เปิดใช้งาน';
+                button1StatusElem.className = 'on';
+            } else if (isButton1Active === false) {
+                button1StatusElem.textContent = 'ปิดใช้งาน';
+                button1StatusElem.className = 'off';
+            } else {
+                button1StatusElem.textContent = 'ไม่ทราบสถานะ';
+                button1StatusElem.className = 'unknown';
+            }
+        });
+
+        // Listener สำหรับ /test/pass (เพื่อแสดงสถานะหลักของ Relay)
+        // เนื่องจาก Relay ถูกควบคุมหลักโดย /test/pass ในโค้ด ESP8266
+        firebasePassRef.on('value', (snapshot) => {
+            const passCommand = snapshot.val();
+            let relayStatusText = 'ไม่ทราบสถานะ';
+            let relayStatusClass = 'unknown';
+
+            if (passCommand === 'reset_10_sec') {
+                relayStatusText = 'เปิด (10 วินาที)';
+                relayStatusClass = 'on';
+            } else if (passCommand === 'reset_1_minute') {
+                relayStatusText = 'เปิด (1 นาที)';
+                relayStatusClass = 'on';
+            } else if (passCommand === 'turn_off') { // ตามโค้ด C++ ของคุณ "turn_off" คือ ON ตลอดไป
+                relayStatusText = 'เปิด (ตลอดไป)';
+                relayStatusClass = 'on';
+            } else if (passCommand === 'non' || passCommand === null || passCommand === "") {
+                relayStatusText = 'ปิด';
+                relayStatusClass = 'off';
+            } else {
+                relayStatusText = `ไม่ทราบคำสั่ง: ${passCommand}`;
+                relayStatusClass = 'unknown';
+            }
+            relayStatusElem.textContent = relayStatusText;
+            relayStatusElem.className = relayStatusClass;
+        });
+
+        // Listener สำหรับ /test/last_seen (สถานะออนไลน์ของ ESP8266)
+        firebaseOnlineStatusRef.on('value', (snapshot) => {
+            const timestamp = snapshot.val(); // timestamp จาก Firebase จะเป็น Milliseconds ตั้งแต่ Epoch
+            if (timestamp) {
+                const currentTime = Date.now(); // เวลาปัจจุบันใน ms (UNIX timestamp)
+                const lastSeenTime = timestamp;
+                const timeDiffSeconds = (currentTime - lastSeenTime) / 1000;
+
+                if (timeDiffSeconds < 60) { // ถ้าน้อยกว่า 1 นาที ถือว่าออนไลน์
+                    deviceOnlineStatusElem.textContent = 'ออนไลน์';
+                    deviceOnlineStatusElem.className = 'online';
+                } else if (timeDiffSeconds < 300) { // น้อยกว่า 5 นาที อาจจะออฟไลน์ไม่นาน
+                    deviceOnlineStatusElem.textContent = `ออฟไลน์ (${Math.round(timeDiffSeconds / 60)} นาทีที่แล้ว)`;
+                    deviceOnlineStatusElem.className = 'offline';
+                }
+                else { // เกิน 5 นาที ถือว่าออฟไลน์
+                    deviceOnlineStatusElem.textContent = `ออฟไลน์ (${Math.round(timeDiffSeconds / 60)} นาทีที่แล้ว)`;
+                    deviceOnlineStatusElem.className = 'offline';
+                }
+            } else {
+                deviceOnlineStatusElem.textContent = 'ไม่พบข้อมูล';
+                deviceOnlineStatusElem.className = 'unknown';
+            }
+        });
+
+    </script>
+</body>
+
+</html>

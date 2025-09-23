@@ -1,0 +1,18 @@
+v1 รับค่าได้ สั่ง servo ได้
+
+v2 ใช้คำสั่งได้ ปรับค่า servoMin,servoMax ได้
+Available Commands:
+  ? or help: Display this help message and current settings.
+  mode=auto: Switch to automatic mode (control via web server).
+  mode=manual: Switch to manual mode (control via Serial Monitor).
+  servoMin=[value]: Set the minimum pulse value (e.g., servoMin=250).
+  servoMax=[value]: Set the maximum pulse value (e.g., servoMax=950).
+  manual_angle=[0-180]: Set the servo angle (only in manual mode).
+-------------------------
+-------------------------
+Current Servo Settings:
+  Mode: manual
+  Servo Min Pulse: 100
+  Servo Max Pulse: 630
+  Manual Angle: 180
+-------------------------

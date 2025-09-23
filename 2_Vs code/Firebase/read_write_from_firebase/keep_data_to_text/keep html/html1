@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Relay Control</title> <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            margin-top: 50px; 
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .button-container {
+            display: flex;
+            flex-wrap: wrap; /* ทำให้ปุ่มขึ้นบรรทัดใหม่ได้ถ้าหน้าจอเล็ก */
+            justify-content: center;
+            gap: 20px; /* ระยะห่างระหว่างปุ่ม */
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        button { 
+            padding: 15px 30px; 
+            font-size: 18px; 
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-width: 180px; /* กำหนดความกว้างขั้นต่ำ */
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Styles สำหรับแต่ละปุ่มให้มีสีต่างกัน */
+        #btn10sec {
+            background-color: #4CAF50; /* Green */
+            color: white;
+        }
+        #btn10sec:hover {
+            background-color: #45a049;
+        }
+
+        #btn1min {
+            background-color: #2196F3; /* Blue */
+            color: white;
+        }
+        #btn1min:hover {
+            background-color: #0b7dda;
+        }
+        
+        #btnIndefinite {
+            background-color: #FFC107; /* Amber */
+            color: #333;
+        }
+        #btnIndefinite:hover {
+            background-color: #e0a800;
+        }
+
+        #btnNon {
+            background-color: #f44336; /* Red */
+            color: white;
+        }
+        #btnNon:hover {
+            background-color: #da190b;
+        }
+
+        #statusMessage {
+            margin-top: 30px;
+            font-size: 1.1em;
+            color: #555;
+        }
+
+        /* CSS เพิ่มเติมสำหรับแสดงสถานะอุปกรณ์ */
+        .status-display-container {
+            margin-top: 40px;
+            padding: 25px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: left; /* ให้ข้อความภายใน div ชิดซ้าย */
+        }
+        .status-display-container h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .status-display-container p {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            display: flex; /* ใช้ flexbox เพื่อจัดวาง label และ value */
+            justify-content: space-between; /* กระจายช่องไฟระหว่าง label และ value */
+            align-items: center;
+        }
+        .status-display-container span {
+            font-weight: bold;
+        }
+        /* สีสถานะออนไลน์/ออฟไลน์ */
+        .online {
+            color: #4CAF50; /* เขียว */
+        }
+        .offline {
+            color: #f44336; /* แดง */
+        }
+        .unknown {
+            color: #FFC107; /* เหลืองอำพัน */
+        }
+        .on {
+            color: #4CAF50; /* เขียว */
+        }
+        .off {
+            color: #f44336; /* แดง */
+        }
+    </style>
+</head>
+<body>
+    <h1>ควบคุม Relay ผ่าน Firebase</h1> <div class="button-container">
+        <button id="btn10sec">เปิด 10 วินาที</button>
+        <button id="btn1min">เปิด 1 นาที</button>
+        <button id="btnIndefinite">เปิดตลอดไป</button>
+        <button id="btnNon">ปิด / ว่าง</button>
+    </div>
+
+    <p id="statusMessage">สถานะ: รอคำสั่ง...</p>
+
+    <div class="status-display-container">
+        <h2>สถานะอุปกรณ์</h2>
+        <p>สถานะ Relay: <span id="relayStatus">กำลังโหลด...</span></p>
+        <p>สถานะอุปกรณ์: <span id="deviceOnlineStatus">กำลังโหลด...</span></p>
+        <p>เปิด-ปิด (10 วินาที): <span id="button1Status">กำลังโหลด...</span></p>
+    </div>
+
+    <script>
+        // *** สำคัญมาก: แทนที่ YOUR_... ด้วยค่า Firebase Config ของคุณเอง ***
+        // ที่คุณคัดลอกมาจาก Firebase Console ในขั้นตอนที่ 1.3
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5af7N99BENR54M5F3TtaekoVYN-TMRc0",
+            authDomain: "app-firebase-servo.firebaseapp.com",
+            databaseURL: "https://app-firebase-servo-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "app-firebase-servo",
+            storageBucket: "app-firebase-servo.firebasestorage.app",
+            messagingSenderId: "317764258286",
+            appId: "1:317764258286:web:eace78c0d5ee3ab9fde6ff"
+        };
+
+        // เริ่มต้น Firebase และอ้างอิงถึงพาธ /test/pass
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const passRef = database.ref('/test/pass'); // อ้างอิงถึงพาธ /test/pass
+
+        // ฟังก์ชันสำหรับอัปเดตข้อความสถานะบนหน้าเว็บ
+        function updateStatus(message) {
+            document.getElementById('statusMessage').innerText = "สถานะ: " + message;
+        }
+
+        // เพิ่ม Event Listener สำหรับแต่ละปุ่ม
+        document.getElementById('btn10sec').addEventListener('click', () => {
+            updateStatus("กำลังส่งคำสั่ง: เปิด 10 วินาที...");
+            passRef.set('reset_10_sec')
+                .then(() => {
+                    console.log("ส่ง 'reset_10_sec' สำเร็จ");
+                    updateStatus("ส่งคำสั่ง 'เปิด 10 วินาที' สำเร็จ!");
+                })
+                .catch(error => {
+                    console.error("ข้อผิดพลาดในการส่ง 'reset_10_sec': ", error);
+                    updateStatus("ส่งคำสั่งไม่สำเร็จ: " + error.message);
+                });
+        });
+
+        document.getElementById('btn1min').addEventListener('click', () => {
+            updateStatus("กำลังส่งคำสั่ง: เปิด 1 นาที...");
+            passRef.set('reset_1_minute')
+                .then(() => {
+                    console.log("ส่ง 'reset_1_minute' สำเร็จ");
+                    updateStatus("ส่งคำสั่ง 'เปิด 1 นาที' สำเร็จ!");
+                })
+                .catch(error => {
+                    console.error("ข้อผิดพลาดในการส่ง 'reset_1_minute': ", error);
+                    updateStatus("ส่งคำสั่งไม่สำเร็จ: " + error.message);
+                });
+        });
+
+        document.getElementById('btnIndefinite').addEventListener('click', () => {
+            updateStatus("กำลังส่งคำสั่ง: เปิดตลอดไป...");
+            passRef.set('turn_off') // เราใช้ 'turn_off' สำหรับโหมด ON ตลอดไป
+                .then(() => {
+                    console.log("ส่ง 'turn_off' (เปิดตลอดไป) สำเร็จ");
+                    updateStatus("ส่งคำสั่ง 'เปิดตลอดไป' สำเร็จ!");
+                })
+                .catch(error => {
+                    console.error("ข้อผิดพลาดในการส่ง 'turn_off': ", error);
+                    updateStatus("ส่งคำสั่งไม่สำเร็จ: " + error.message);
+                });
+        });
+
+        document.getElementById('btnNon').addEventListener('click', () => {
+            updateStatus("กำลังส่งคำสั่ง: ปิด / ว่าง...");
+            passRef.set('non')
+                .then(() => {
+                    console.log("ส่ง 'non' (ปิด/ว่าง) สำเร็จ");
+                    updateStatus("ส่งคำสั่ง 'ปิด / ว่าง' สำเร็จ!");
+                })
+                .catch(error => {
+                    console.error("ข้อผิดพลาดในการส่ง 'non': ", error);
+                    updateStatus("ส่งคำสั่งไม่สำเร็จ: " + error.message);
+                });
+        });
+
+        // (ไม่บังคับ) คุณสามารถเพิ่มการฟังค่าจาก Firebase เพื่อแสดงสถานะปัจจุบันบนหน้าเว็บได้
+        // passRef.on('value', (snapshot) => {
+        //      const data = snapshot.val();
+        //      if (data) {
+        //          updateStatus("ค่าล่าสุดจาก Firebase: " + data);
+        //      }
+        // });
+
+        // อ้างอิงถึงพาธสถานะต่างๆ
+        const onlineStatusRef = database.ref('/test/last_seen');
+        const button1Ref = database.ref('/test/button1');
+
+        // อ้างอิงถึง Element ที่จะแสดงผล
+        const relayStatusElement = document.getElementById('relayStatus');
+        const deviceOnlineStatusElement = document.getElementById('deviceOnlineStatus');
+        const button1StatusElement = document.getElementById('button1Status');
+
+        // ฟังก์ชันสำหรับฟอร์แมตเวลา
+        function formatTimeAgo(timestamp) {
+            if (!timestamp) return 'ไม่มีข้อมูล';
+
+            const now = new Date();
+            const lastSeen = new Date(timestamp);
+            const seconds = Math.floor((now.getTime() - lastSeen.getTime()) / 1000);
+
+            if (seconds < 60) {
+                return `ออนไลน์ (${seconds} วินาทีที่แล้ว)`;
+            } else if (seconds < 3600) {
+                return `ออนไลน์ (${Math.floor(seconds / 60)} นาทีที่แล้ว)`;
+            } else if (seconds < 86400) {
+                return `ออนไลน์ (${Math.floor(seconds / 3600)} ชั่วโมงที่แล้ว)`;
+            } else {
+                return `ออนไลน์ (${Math.floor(seconds / 86400)} วันที่แล้ว)`;
+            }
+        }
+
+        // --- ฟังการเปลี่ยนแปลงของสถานะ /test/pass (สถานะ Relay) ---
+        passRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            let statusText = "ไม่ทราบสถานะ";
+            let statusClass = "unknown";
+
+            // ตรวจสอบสถานะจริงของ Relay จาก main.cpp
+            // (เราต้องอิงจาก logic ที่ ESP8266 ใช้)
+            if (data === "non") {
+                statusText = "ปิดอยู่";
+                statusClass = "off";
+            } else if (data === "reset_10_sec") {
+                statusText = "เปิดอยู่ (10 วินาที)";
+                statusClass = "on";
+            } else if (data === "reset_1_minute") {
+                statusText = "เปิดอยู่ (1 นาที)";
+                statusClass = "on";
+            } else if (data === "turn_off") { // ใน main.cpp เราใช้ turn_off เป็น ON ตลอดไป
+                statusText = "เปิดอยู่ (ตลอดไป)";
+                statusClass = "on";
+            }
+
+            relayStatusElement.textContent = statusText;
+            // ลบ class เก่าทั้งหมดก่อนเพิ่ม class ใหม่
+            relayStatusElement.classList.remove('on', 'off', 'unknown');
+            relayStatusElement.classList.add(statusClass);
+        });
+
+        // --- ฟังการเปลี่ยนแปลงของสถานะ /test/last_seen (สถานะออนไลน์) ---
+        onlineStatusRef.on('value', (snapshot) => {
+            const timestamp = snapshot.val();
+            let statusText = "ออฟไลน์";
+            let statusClass = "offline";
+
+            if (timestamp) {
+                const now = new Date().getTime();
+                // ตรวจสอบว่า last_seen ไม่เกิน 60 วินาที (จาก ESP8266 main.cpp ที่อัปเดตทุก 30 วินาที)
+                // ให้เผื่อเวลาไว้เล็กน้อย เช่น 45-60 วินาที
+                if ((now - timestamp) < 60000) { // น้อยกว่า 60 วินาที
+                    statusText = formatTimeAgo(timestamp);
+                    statusClass = "online";
+                } else {
+                    statusText = "ออฟไลน์"; // เกิน 60 วินาที ถือว่าออฟไลน์
+                    statusClass = "offline";
+                }
+            } else {
+                statusText = "ยังไม่เคยออนไลน์"; // ถ้าไม่มี timestamp เลย
+                statusClass = "offline";
+            }
+
+            deviceOnlineStatusElement.textContent = statusText;
+            deviceOnlineStatusElement.classList.remove('online', 'offline', 'unknown');
+            deviceOnlineStatusElement.classList.add(statusClass);
+        });
+        
+        // --- ฟังการเปลี่ยนแปลงของสถานะ /test/button1 (สถานะปุ่ม 10 วินาที) ---
+        button1Ref.on('value', (snapshot) => {
+            const data = snapshot.val();
+            let statusText = "ไม่ทราบสถานะ";
+            let statusClass = "unknown";
+
+            if (typeof data === 'boolean') { // ตรวจสอบว่าเป็น boolean ไหม
+                if (data === true) {
+                    statusText = "เปิดอยู่ (จากปุ่ม)";
+                    statusClass = "on";
+                } else {
+                    statusText = "ปิดอยู่ (จากปุ่ม)";
+                    statusClass = "off";
+                }
+            } else {
+                statusText = "ไม่มีข้อมูล"; // กรณีข้อมูลไม่เป็น boolean
+                statusClass = "unknown";
+            }
+            button1StatusElement.textContent = statusText;
+            button1StatusElement.classList.remove('on', 'off', 'unknown');
+            button1StatusElement.classList.add(statusClass);
+        });
+    </script>
+</body>
+</html>
