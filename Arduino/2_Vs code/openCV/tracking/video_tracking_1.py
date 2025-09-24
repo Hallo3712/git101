@@ -2,6 +2,7 @@ import cv2
 import time
 
 video_path = 'C:/Users/PC6958/Videos/takraw.mp4'
+#video_path = 'C:/Users/PC6958/Videos/birdFlying.mp4'
 cap = cv2.VideoCapture(video_path)
 
 if not cap.isOpened():
