@@ -40,13 +40,13 @@ def draw_sloped_lane_divider(frame, y_start, y_end):
 
 # ตั้งค่าตัวแปรต่างๆ
 ratio = 0.7  # สเกลของรูปภาพที่แสดง (กำหนดเอง)
-line_y_in = 1300      # ค่าแกน y (ฝั่งขาเข้า, ขวา) (กำหนดเอง)
-line_y_out = line_y_in   # ค่าแกน y (ฝั่งขาออก, ซ้าย) (กำหนดเอง)
-lane_divider_slope = 0.376    # คำนวนจากสูตรเส้นตรง
-lane_divider_intercept = 1485.7  # คำนวนจากสูตรเส้นตรง
+line_y_out = 200   # ค่าแกน y (ฝั่งขาออก, ซ้าย) (กำหนดเอง)
+line_y_in = line_y_out      # ค่าแกน y (ฝั่งขาเข้า, ขวา) (กำหนดเอง)
+lane_divider_slope = -0.921   # คำนวนจากสูตรเส้นตรง
+lane_divider_intercept = 500.4  # คำนวนจากสูตรเส้นตรง
 divider_x_at_out = get_lane_divider_x(line_y_out)
 divider_x_at_in = get_lane_divider_x(line_y_in)
-# name = "YOLO car count"
+name = "YOLO car count"
 
 # class_count_in = {}
 # class_count_out = {}
@@ -60,6 +60,8 @@ class_list = model.names
 
 
 cap = cv2.VideoCapture("C:\\Users\\PC6958\\Videos\\car.mp4")
+cv2.namedWindow(name)
+cv2.setMouseCallback(name,mouse_callback)
 
 while (cap.isOpened()): 
     ret , frame = cap.read() # อ่านภาพจากกล้อง 
@@ -78,6 +80,10 @@ while (cap.isOpened()):
         print("vdo false")
         break
 
+    draw_sloped_lane_divider(frame,y_start=140,y_end=frame.shape[0])
+    # left lane (OUT)
+    cv2.line(frame,(0,line_y_out),(divider_x_at_out,line_y_out),(0,0,255),3)
+
     results = model.track(frame,persist=True,classes=[0,1,2,3,5,7],device='cpu',verbose=False)
     # print("result is "+str(results))
 
@@ -91,8 +97,15 @@ while (cap.isOpened()):
         for box,track_id,class_idx,conf in zip(boxes,track_ids,class_indices, confidences):
             print(box,track_id,class_idx,conf)
             x1 ,y1 ,x2 ,y2 = map (int,box)
-            
+
+            cx = (x1+x2)//2
+            cy = (y1+y2)//2
+            print("cx,cy is ")
+            print(cx,cy)
+
             class_name = class_list[class_idx]
+
+            cv2.circle(frame,(cx,cy),4,(0,0,255),5)
             cv2.putText(frame,f"ID: {track_id} {class_name} ", (x1,y1 - 10),cv2.FONT_HERSHEY_DUPLEX,0.6,(255,0,0),2)
             
             
@@ -100,9 +113,9 @@ while (cap.isOpened()):
             cv2.rectangle(frame, (x1,y1),(x2,y2),(0,255,0),2)
 
     scaled_frame = cv2.resize(frame, (new_width, new_height))
-    cv2.imshow("vdo",scaled_frame)
-    if cv2.waitKey(1) & 0xff == ord('q'):
-        print("button q prissed")
+    cv2.imshow(name,scaled_frame)
+    if cv2.waitKey(0) & 0xff == ord('q'):
+        print("button q pressed")
         break
 
 cap.release() # ปิดกล้อง
