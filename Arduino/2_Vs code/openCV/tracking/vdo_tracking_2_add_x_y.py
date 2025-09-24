@@ -12,6 +12,10 @@ if not cap.isOpened():
 fps = cap.get(cv2.CAP_PROP_FPS)
 frame_time = 1 / fps if fps > 0 else 0.033
 
+# กำหนดขนาดใหม่ที่ต้องการ (เช่น 640x480)
+new_width = 640
+new_height = 480
+
 tracker = None
 roi = None
 is_tracking = False
@@ -24,6 +28,11 @@ while True:
         ret, frame = cap.read()
         if not ret:
             break
+        
+        # เพิ่มโค้ด resize ตรงนี้
+        # โดยการปรับขนาด 'frame' ก่อนที่จะนำไปใช้
+        frame = cv2.resize(frame, (new_width, new_height))
+        
     else:
         # ถ้าหยุดอยู่ ก็ใช้เฟรมเดิม
         pass
@@ -40,9 +49,8 @@ while True:
             # เพิ่มโค้ดส่วนนี้เพื่อแสดงพิกัด
             center_x = x + w // 2
             center_y = y + h // 2
-            text = f"Center: ({center_x}, {center_y})"
-            # กำหนดตำแหน่งให้อยู่ที่มุมล่างซ้าย
-            cv2.putText(display_frame, text, (10, display_frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            text = f"({center_x}, {center_y})"
+            cv2.putText(display_frame, text, (10, display_frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         else:
             is_tracking = False
             tracker = None
@@ -56,10 +64,10 @@ while True:
 
     if key == ord('s'):
         is_paused = True
+        # เมื่อเลือก ROI จะทำการเลือกจาก 'frame' ที่ถูก resize แล้ว
         roi = cv2.selectROI('Video Tracker', frame, showCrosshair=False)
         is_paused = False
         
-        # เมื่อเลือก ROI เสร็จแล้ว ให้เริ่มต้นการ tracking ทันที
         if roi and roi != (0, 0, 0, 0):
             tracker = cv2.TrackerCSRT_create()
             tracker.init(frame, roi)
