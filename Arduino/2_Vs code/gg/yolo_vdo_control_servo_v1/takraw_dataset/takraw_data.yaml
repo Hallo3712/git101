@@ -1,0 +1,12 @@
+# The path to the dataset's parent directory
+path: C:/Users/PC6958/Desktop/TAWAN/Arduino/YOLO/yolo_vdo_control_servo_v1/takraw_dataset
+
+# Paths to the training and validation images
+train: images
+val: images
+
+# Number of classes
+nc: 1
+
+# Class names
+names: ['takraw']
