@@ -40,7 +40,7 @@ def draw_sloped_lane_divider(frame, y_start, y_end):
 
 # ตั้งค่าตัวแปรต่างๆ
 ratio = 0.7  # สเกลของรูปภาพที่แสดง (กำหนดเอง)
-line_y_out = 280   # ค่าแกน y (ฝั่งขาออก, ซ้าย) (กำหนดเอง)
+line_y_out = 250   # ค่าแกน y (ฝั่งขาออก, ซ้าย) (กำหนดเอง)
 line_y_in = line_y_out      # ค่าแกน y (ฝั่งขาเข้า, ขวา) (กำหนดเอง)
 lane_divider_slope = -0.921   # คำนวนจากสูตรเส้นตรง
 lane_divider_intercept = 500.4  # คำนวนจากสูตรเส้นตรง
@@ -48,10 +48,10 @@ divider_x_at_out = get_lane_divider_x(line_y_out)
 divider_x_at_in = get_lane_divider_x(line_y_in)
 name = "YOLO car count"
 
-# class_count_in = {}
-# class_count_out = {}
-# crossed_in_ids  = set()
-# crossed_out_ids = set()
+class_count_in = {}
+class_count_out = {}
+crossed_in_ids  = set()
+crossed_out_ids = set()
 
 # โหลด YOLO model
 model = YOLO('yolov8n.pt')
@@ -79,7 +79,7 @@ while (cap.isOpened()):
     if not ret:
         print("vdo false")
         break
-    
+    """
     print("line_y_out")
     print(line_y_out)
 
@@ -91,16 +91,18 @@ while (cap.isOpened()):
 
     print("divider_x_at_in")
     print(divider_x_at_in)
-
+"""
     draw_sloped_lane_divider(frame,y_start=140,y_end=frame.shape[0])
     # cv2.arrowedLine(frame, (0, line_y_in), (950, line_y_out), (0, 0, 0), 3)
     # cv2.arrowedLine(frame, (divider_x_at_in,line_y_in), (divider_x_at_out,line_y_out), (255, 0, 0), 3)
 
     # left lane (OUT)
     cv2.line(frame,(0,line_y_out),(divider_x_at_out,line_y_out),(0,0,255),3)
-
+    cv2.putText(frame,"OUT",(800,line_y_in-10),cv2.FONT_HERSHEY_DUPLEX,2,(255,0,0),3)
     # Right lane (IN)
-    cv2.line(frame,(divider_x_at_in,line_y_in),(800,line_y_in),(255,0,0),3)
+    cv2.line(frame,(divider_x_at_in,line_y_in),(frame.shape[1],line_y_in),(255,0,0),3)
+    cv2.putText(frame,"IN",(10,line_y_in-10),cv2.FONT_HERSHEY_DUPLEX,2,(0,0,255),3)
+
 
     results = model.track(frame,persist=True,classes=[0,1,2,3,5,7],device='cpu',verbose=False)
     # print("result is "+str(results))
@@ -118,17 +120,30 @@ while (cap.isOpened()):
 
             cx = (x1+x2)//2
             cy = (y1+y2)//2
-            print("cx,cy is ")
-            print(cx,cy)
+            # print("cx,cy is ")
+            # print(cx,cy)
 
             class_name = class_list[class_idx]
+
+            divider_x_at_vehicle = get_lane_divider_x(cy)
 
             cv2.circle(frame,(cx,cy),4,(0,0,255),5)
             cv2.putText(frame,f"ID: {track_id} {class_name} ", (x1,y1 - 10),cv2.FONT_HERSHEY_DUPLEX,0.6,(255,0,0),2)
             
-            
-
+        
             cv2.rectangle(frame, (x1,y1),(x2,y2),(0,255,0),2)
+
+            if cx > divider_x_at_vehicle and cy < line_y_in and track_id not in crossed_in_ids:
+                crossed_in_ids.add(track_id)
+                class_count_in[class_name] = class_count_in.get(class_name, 0) + 1
+            if cx < divider_x_at_vehicle and cy > line_y_out and track_id not in crossed_out_ids:
+                crossed_out_ids.add(track_id)
+                class_count_out[class_name] = class_count_out.get(class_name, 0) + 1
+            
+            # print("class_count_out")
+            # print(class_count_out)
+            # print("class_count_in")
+            # print(class_count_in)
 
     scaled_frame = cv2.resize(frame, (new_width, new_height))
     cv2.imshow(name,scaled_frame)
