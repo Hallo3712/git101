@@ -40,7 +40,7 @@ def draw_sloped_lane_divider(frame, y_start, y_end):
 
 # ตั้งค่าตัวแปรต่างๆ
 ratio = 0.7  # สเกลของรูปภาพที่แสดง (กำหนดเอง)
-line_y_out = 200   # ค่าแกน y (ฝั่งขาออก, ซ้าย) (กำหนดเอง)
+line_y_out = 280   # ค่าแกน y (ฝั่งขาออก, ซ้าย) (กำหนดเอง)
 line_y_in = line_y_out      # ค่าแกน y (ฝั่งขาเข้า, ขวา) (กำหนดเอง)
 lane_divider_slope = -0.921   # คำนวนจากสูตรเส้นตรง
 lane_divider_intercept = 500.4  # คำนวนจากสูตรเส้นตรง
@@ -79,10 +79,28 @@ while (cap.isOpened()):
     if not ret:
         print("vdo false")
         break
+    
+    print("line_y_out")
+    print(line_y_out)
+
+    print("line_y_in")
+    print(line_y_in)
+
+    print("divider_x_at_out")
+    print(divider_x_at_out)
+
+    print("divider_x_at_in")
+    print(divider_x_at_in)
 
     draw_sloped_lane_divider(frame,y_start=140,y_end=frame.shape[0])
+    # cv2.arrowedLine(frame, (0, line_y_in), (950, line_y_out), (0, 0, 0), 3)
+    # cv2.arrowedLine(frame, (divider_x_at_in,line_y_in), (divider_x_at_out,line_y_out), (255, 0, 0), 3)
+
     # left lane (OUT)
     cv2.line(frame,(0,line_y_out),(divider_x_at_out,line_y_out),(0,0,255),3)
+
+    # Right lane (IN)
+    cv2.line(frame,(divider_x_at_in,line_y_in),(800,line_y_in),(255,0,0),3)
 
     results = model.track(frame,persist=True,classes=[0,1,2,3,5,7],device='cpu',verbose=False)
     # print("result is "+str(results))
@@ -114,7 +132,7 @@ while (cap.isOpened()):
 
     scaled_frame = cv2.resize(frame, (new_width, new_height))
     cv2.imshow(name,scaled_frame)
-    if cv2.waitKey(0) & 0xff == ord('q'):
+    if cv2.waitKey(1) & 0xff == ord('q'):
         print("button q pressed")
         break
 
