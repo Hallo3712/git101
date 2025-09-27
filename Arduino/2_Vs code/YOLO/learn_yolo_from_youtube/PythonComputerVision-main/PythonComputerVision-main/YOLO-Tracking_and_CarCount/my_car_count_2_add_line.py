@@ -35,13 +35,13 @@ def draw_sloped_lane_divider(frame, y_start, y_end):
     """Draw sloped lane divider based on curb"""
     x_start = get_lane_divider_x(y_start)
     x_end = get_lane_divider_x(y_end)
-    cv2.line(frame, (x_start, y_start), (x_end, y_end), (255, 255, 255), 3)
+    cv2.line(frame, (x_start, y_start), (x_end, y_end), (255, 0, 255), 3)
 
 
 # ตั้งค่าตัวแปรต่างๆ
 ratio = 0.7  # สเกลของรูปภาพที่แสดง (กำหนดเอง)
-line_y_out = 250   # ค่าแกน y (ฝั่งขาออก, ซ้าย) (กำหนดเอง)
-line_y_in = line_y_out      # ค่าแกน y (ฝั่งขาเข้า, ขวา) (กำหนดเอง)
+line_y_out = 225   # ค่าแกน y (ฝั่งขาออก, ซ้าย) (กำหนดเอง)
+line_y_in = 300      # ค่าแกน y (ฝั่งขาเข้า, ขวา) (กำหนดเอง)
 lane_divider_slope = -0.921   # คำนวนจากสูตรเส้นตรง
 lane_divider_intercept = 500.4  # คำนวนจากสูตรเส้นตรง
 divider_x_at_out = get_lane_divider_x(line_y_out)
@@ -73,15 +73,14 @@ while (cap.isOpened()):
     new_height = int(frame.shape[0] * ratio)
 
     # print("after resize is ("+str(new_height)+", "+str(new_width)+ ")")
-    print(f"after resize is ({new_height}, {new_width})")
+    # print(f"after resize is ({new_height}, {new_width})")
     #print("after resize is "+str(shape))
 
     if not ret:
         print("vdo false")
         break
+    # print("line_y_out "+str(line_y_out))
     """
-    print("line_y_out")
-    print(line_y_out)
 
     print("line_y_in")
     print(line_y_in)
@@ -96,14 +95,14 @@ while (cap.isOpened()):
     # cv2.arrowedLine(frame, (0, line_y_in), (950, line_y_out), (0, 0, 0), 3)
     # cv2.arrowedLine(frame, (divider_x_at_in,line_y_in), (divider_x_at_out,line_y_out), (255, 0, 0), 3)
 
-    # left lane (OUT)
     cv2.line(frame,(0,line_y_out),(divider_x_at_out,line_y_out),(0,0,255),3)
-    cv2.putText(frame,"OUT",(800,line_y_in-10),cv2.FONT_HERSHEY_DUPLEX,2,(255,0,0),3)
-    # Right lane (IN)
     cv2.line(frame,(divider_x_at_in,line_y_in),(frame.shape[1],line_y_in),(255,0,0),3)
-    cv2.putText(frame,"IN",(10,line_y_in-10),cv2.FONT_HERSHEY_DUPLEX,2,(0,0,255),3)
+    # cv2.putText(frame,"Befor IN",(700,line_y_in-10),cv2.FONT_HERSHEY_DUPLEX,1,(255,0,0),3)
+    # cv2.putText(frame,"IN",(800,line_y_in+40),cv2.FONT_HERSHEY_DUPLEX,1,(255,0,0),3)
+    # cv2.putText(frame,"OUT",(10,line_y_out-10),cv2.FONT_HERSHEY_DUPLEX,1,(0,0,255),3)
+    # cv2.putText(frame,"Befor OUT",(10,line_y_out+50),cv2.FONT_HERSHEY_DUPLEX,1,(0,0,255),3)
 
-
+    
     results = model.track(frame,persist=True,classes=[0,1,2,3,5,7],device='cpu',verbose=False)
     # print("result is "+str(results))
 
@@ -139,11 +138,30 @@ while (cap.isOpened()):
             if cx < divider_x_at_vehicle and cy > line_y_out and track_id not in crossed_out_ids:
                 crossed_out_ids.add(track_id)
                 class_count_out[class_name] = class_count_out.get(class_name, 0) + 1
-            
-            # print("class_count_out")
+            # print("divider_x_at_vehicle "+str(divider_x_at_vehicle))
+            print("class_count_out"+str(class_count_out))
             # print(class_count_out)
-            # print("class_count_in")
+            print("class_count_in"+str(class_count_in))
             # print(class_count_in)
+
+    # แสดงจำนวนบนรูป
+    y_offset = 30
+    cv2.putText(frame, "VEHICLES IN (Right Lane):", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+    y_offset += 25
+    
+    for class_name, count in class_count_in.items():
+        cv2.putText(frame, f"{class_name}: {count}", (30, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        y_offset += 25
+        
+    y_offset += 10
+    cv2.putText(frame, "VEHICLES OUT (Left Lane):", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+    y_offset += 25
+    
+    for class_name, count in class_count_out.items():
+        cv2.putText(frame, f"{class_name}: {count}", (30, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        y_offset += 25
 
     scaled_frame = cv2.resize(frame, (new_width, new_height))
     cv2.imshow(name,scaled_frame)
