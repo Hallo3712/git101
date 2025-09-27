@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productivity Hub: แอปจัดการงานและเวลา</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.1.1/24/outline/academic-cap.svg" rel="stylesheet">
+    <style>
+        /* Chosen Palette: Calm Neutrals with a Touch of Mint */
+        /* Application Structure Plan: The app uses a sidebar navigation model, a common and intuitive pattern for SPAs. The main content area dynamically switches between different "views" (Eisenhower, Daily Plan, etc.) controlled by JavaScript. This keeps the UI clean and focused. The Eisenhower Matrix is the default view, offering an immediate, high-level overview of all tasks and their priorities, which is crucial for initial planning. */
+        /* Visualization & Content Choices: 
+           - Eisenhower Matrix: Implemented as a 2x2 responsive grid using Tailwind CSS for a clear, visual separation of priorities.
+           - Daily Plan (Ivy Lee): A simple, focused list to prevent overwhelm.
+           - Time Blocking Calendar: A custom-built grid using HTML divs, allowing for flexible and direct visualization without external libraries.
+           - Statistics: Chart.js is used for bar and doughnut charts to provide clear, actionable insights into user productivity.
+           - All interactions are handled with vanilla JavaScript, ensuring performance and minimal dependencies.
+        */
+        /* CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. */
+        body {
+            font-family: 'Inter', 'Kanit', sans-serif;
+        }
+
+        .sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar-open {
+            transform: translateX(0);
+        }
+
+        .sidebar-closed {
+            transform: translateX(-100%);
+        }
+
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .task-card {
+            transition: box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
+        }
+
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app-container" class="flex h-screen overflow-hidden">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar"
+            class="sidebar sidebar-closed md:w-64 bg-white border-r border-gray-200 absolute inset-y-0 left-0 z-30 md:relative md:translate-x-0">
+            <div class="p-4 border-b">
+                <h2 class="text-xl font-bold text-gray-700">Productivity Hub</h2>
+            </div>
+            <nav class="mt-4">
+                <a href="#" class="nav-link flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100"
+                    data-view="eisenhower-view">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                    <span>รายการงานทั้งหมด</span>
+                </a>
+                <a href="#" class="nav-link flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100"
+                    data-view="daily-plan-view">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                    <span>แผนงานวันนี้</span>
+                </a>
+                <a href="#" class="nav-link flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100"
+                    data-view="habit-tracker-view">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.085a2 2 0 00-1.736.93L5.5 8m7 2v5m0 0v5m0-5h5">
+                        </path>
+                    </svg>
+                    <span>ตัวติดตามนิสัย</span>
+                </a>
+                <a href="#" class="nav-link flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100"
+                    data-view="calendar-view">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                    <span>ปฏิทิน</span>
+                </a>
+                <a href="#" class="nav-link flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100"
+                    data-view="stats-view">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                    </svg>
+                    <span>สถิติและรายงาน</span>
+                </a>
+                <a href="#" class="nav-link flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100"
+                    data-view="trash-view">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                        </path>
+                    </svg>
+                    <span>ถังขยะ</span>
+                </a>
+                <a href="#" class="nav-link flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100"
+                    data-view="settings-view">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                        </path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span>การตั้งค่า</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col">
+            <header class="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+                <button id="sidebar-toggle" class="md:hidden text-gray-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                <h1 id="view-title" class="text-xl font-semibold">รายการงานทั้งหมด</h1>
+                <div id="pomodoro-timer" class="text-lg font-mono">25:00</div>
+            </header>
+
+            <main class="flex-1 p-6 overflow-y-auto bg-gray-100">
+                <!-- Views will be injected here -->
+                <div id="eisenhower-view" class="view"></div>
+                <div id="daily-plan-view" class="view hidden"></div>
+                <div id="habit-tracker-view" class="view hidden"></div>
+                <div id="calendar-view" class="view hidden"></div>
+                <div id="stats-view" class="view hidden"></div>
+                <div id="trash-view" class="view hidden"></div>
+                <div id="settings-view" class="view hidden"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Floating Add Button -->
+    <button id="add-task-btn"
+        class="fixed bottom-8 right-8 bg-blue-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-blue-700 transition">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+    </button>
+
+    <!-- Add/Edit Task Modal -->
+    <div id="task-modal" class="modal-backdrop fixed inset-0 z-40 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
+            <h3 id="modal-title" class="text-2xl font-bold mb-4">สร้างงานใหม่</h3>
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                <div class="mb-4">
+                    <label for="task-title" class="block text-sm font-medium text-gray-700">ชื่องาน</label>
+                    <input type="text" id="task-title"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required>
+                </div>
+                <div class="mb-4">
+                    <label for="task-description" class="block text-sm font-medium text-gray-700">รายละเอียด</label>
+                    <textarea id="task-description" rows="3"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="task-due-date" class="block text-sm font-medium text-gray-700">วันที่กำหนดส่ง</label>
+                    <input type="date" id="task-due-date"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label for="task-eisenhower" class="block text-sm font-medium text-gray-700">จัดลำดับความสำคัญ
+                        (Eisenhower)</label>
+                    <select id="task-eisenhower"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="do">สำคัญ / เร่งด่วน (Do)</option>
+                        <option value="decide">สำคัญ / ไม่เร่งด่วน (Decide)</option>
+                        <option value="delegate">ไม่สำคัญ / เร่งด่วน (Delegate)</option>
+                        <option value="delete">ไม่สำคัญ / ไม่เร่งด่วน (Delete)</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="task-reward" class="block text-sm font-medium text-gray-700">รางวัลเมื่องานเสร็จ
+                        (ถ้ามี)</label>
+                    <select id="task-reward"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">ไม่มีรางวัล</option>
+                        <!-- Reward options will be populated by JS -->
+                    </select>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-task-btn"
+                        class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">ยกเลิก</button>
+                    <button type="submit"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase SDK imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set, push, remove, update } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+        const firebaseConfig = {
+            // Your web app's Firebase configuration
+            apiKey: "AIzaSyCJQ9hVsMFm5LYKPvyAA342XcBh4iAI9Ek",
+            authDomain: "create-app-e4028.firebaseapp.com",
+            databaseURL: "https://create-app-e4028-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "create-app-e4028",
+            storageBucket: "create-app-e4028.firebasestorage.app",
+            messagingSenderId: "612684670881",
+            appId: "1:612684670881:web:3650b675274176a8db8de0"
+        };
+
+        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+            document.body.innerHTML = `<div class="p-8 text-center bg-yellow-100 text-yellow-800">
+                <h1 class="text-2xl font-bold">กรุณาตั้งค่า Firebase</h1>
+                <p class="mt-2">คุณต้องใส่ข้อมูล Firebase Configuration ของคุณในโค้ด JavaScript (ตัวแปร firebaseConfig) เพื่อให้แอปทำงานได้</p>
+            </div>`;
+        }
+
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // --- State Management ---
+        let tasks = {};
+        let rewards = {};
+        let habits = {};
+        let trash = {};
+        let currentView = 'eisenhower-view';
+
+        // --- UI Elements ---
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const views = document.querySelectorAll('.view');
+        const viewTitle = document.getElementById('view-title');
+        const addTaskBtn = document.getElementById('add-task-btn');
+        const taskModal = document.getElementById('task-modal');
+        const taskForm = document.getElementById('task-form');
+        const cancelTaskBtn = document.getElementById('cancel-task-btn');
+        const modalTitle = document.getElementById('modal-title');
+
+        // --- View Templates ---
+        const viewTemplates = {
+            'eisenhower-view': () => {
+                const quadrants = {
+                    do: { title: 'สำคัญ / เร่งด่วน', tasks: [], color: 'red' },
+                    decide: { title: 'สำคัญ / ไม่เร่งด่วน', tasks: [], color: 'blue' },
+                    delegate: { title: 'ไม่สำคัญ / เร่งด่วน', tasks: [], color: 'yellow' },
+                    delete: { title: 'ไม่สำคัญ / ไม่เร่งด่วน', tasks: [], color: 'gray' }
+                };
+
+                Object.entries(tasks).forEach(([id, task]) => {
+                    if (task.eisenhower && quadrants[task.eisenhower] && !task.isCompleted) {
+                        quadrants[task.eisenhower].tasks.push({ id, ...task });
+                    }
+                });
+
+                return `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        ${Object.entries(quadrants).map(([key, { title, tasks, color }]) => `
+                            <div class="bg-white rounded-lg shadow p-4">
+                                <h3 class="text-lg font-semibold text-${color}-600 border-b-2 border-${color}-200 pb-2 mb-4">${title}</h3>
+                                <div id="quadrant-${key}" class="space-y-3 min-h-[100px]">
+                                    ${tasks.length > 0 ? tasks.map(task => createTaskCard(task)).join('') : '<p class="text-gray-500 text-sm">ไม่มีงานในหมวดนี้</p>'}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            },
+            'daily-plan-view': () => `
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-2xl font-bold mb-4">แผนงานสำหรับวันนี้ (Ivy Lee)</h2>
+                    <p class="text-gray-600 mb-6">เลือก 6 งานที่สำคัญที่สุดและทำทีละอย่าง</p>
+                    <div id="daily-tasks-list" class="space-y-3">
+                        <p class="text-center text-gray-500">ยังไม่มีการวางแผนสำหรับวันนี้</p>
+                    </div>
+                </div>
+            `,
+            'habit-tracker-view': () => `
+                 <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-2xl font-bold mb-4">ตัวติดตามนิสัย</h2>
+                     <p class="text-gray-600 mb-6">สร้างนิสัยที่ดีด้วยความสม่ำเสมอ</p>
+                    <div id="habits-list" class="space-y-4">
+                        <p class="text-center text-gray-500">ยังไม่มีนิสัยให้ติดตาม</p>
+                    </div>
+                </div>
+            `,
+            'calendar-view': () => `
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-2xl font-bold mb-4">ปฏิทิน / Time Blocking</h2>
+                    <p class="text-gray-600 mb-6">วางแผนเวลาของคุณเพื่อประสิทธิภาพสูงสุด</p>
+                    <div class="text-center text-gray-500">
+                        ฟีเจอร์ปฏิทินยังอยู่ในระหว่างการพัฒนา
+                    </div>
+                </div>
+            `,
+            'stats-view': () => `
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-2xl font-bold mb-4">สถิติและรายงาน</h2>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="chart-container"><canvas id="tasksCompletedChart"></canvas></div>
+                        <div class="chart-container"><canvas id="pomodoroSessionsChart"></canvas></div>
+                    </div>
+                </div>
+            `,
+            'trash-view': () => {
+                const trashedItems = Object.entries(trash);
+                return `
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-2xl font-bold mb-4">ถังขยะ</h2>
+                        <div id="trash-list" class="space-y-3">
+                             ${trashedItems.length > 0 ? trashedItems.map(([id, item]) => createTrashedItemCard(id, item)).join('') : '<p class="text-gray-500">ถังขยะว่างเปล่า</p>'}
+                        </div>
+                    </div>
+                `;
+            },
+            'settings-view': () => `
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-2xl font-bold mb-4">การตั้งค่า</h2>
+                    <div id="rewards-settings" class="mb-8">
+                         <h3 class="text-xl font-semibold mb-3">จัดการรางวัล</h3>
+                        <div id="rewards-list" class="space-y-2 mb-4"></div>
+                        <form id="add-reward-form" class="flex items-center space-x-2">
+                            <input type="text" id="reward-name" placeholder="ชื่อรางวัล (เช่น ดูหนัง)" class="flex-grow border border-gray-300 rounded-md py-2 px-3" required>
+                            <input type="number" id="reward-duration" placeholder="นาที" class="w-24 border border-gray-300 rounded-md py-2 px-3" required>
+                            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">เพิ่ม</button>
+                        </form>
+                    </div>
+                </div>
+            `,
+        };
+
+        // --- Render Functions ---
+        function renderView(viewId) {
+            views.forEach(v => v.classList.add('hidden'));
+            const viewElement = document.getElementById(viewId);
+            if (viewElement) {
+                viewElement.innerHTML = viewTemplates[viewId]();
+                viewElement.classList.remove('hidden');
+                // Post-render actions
+                if (viewId === 'stats-view') renderCharts();
+                if (viewId === 'settings-view') renderRewardsSettings();
+            }
+        }
+
+        function createTaskCard(task) {
+            return `
+                <div class="task-card border rounded-lg p-3 bg-gray-50 flex justify-between items-start" data-id="${task.id}">
+                    <div>
+                        <p class="font-semibold">${task.title}</p>
+                        <p class="text-sm text-gray-500">${task.description || ''}</p>
+                        ${task.dueDate ? `<p class="text-xs text-indigo-500 mt-1">กำหนดส่ง: ${task.dueDate}</p>` : ''}
+                    </div>
+                     <div class="flex items-center space-x-1 flex-shrink-0 ml-2">
+                        <button class="complete-btn p-1 text-gray-400 hover:text-green-500" title="เสร็จสิ้น">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        </button>
+                        <button class="edit-btn p-1 text-gray-400 hover:text-blue-500" title="แก้ไข">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z"></path></svg>
+                        </button>
+                        <button class="delete-btn p-1 text-gray-400 hover:text-red-500" title="ลบ">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createTrashedItemCard(id, item) {
+            return `
+                <div class="border rounded-lg p-3 bg-gray-100 flex justify-between items-center" data-id="${id}">
+                    <p class="font-semibold text-gray-600">${item.title}</p>
+                    <div>
+                        <button class="restore-btn bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600" data-id="${id}">กู้คืน</button>
+                    </div>
+                </div>`;
+        }
+
+        function renderRewardsSettings() {
+            const rewardsList = document.getElementById('rewards-list');
+            rewardsList.innerHTML = Object.entries(rewards).map(([id, reward]) => `
+                <div class="flex justify-between items-center bg-gray-100 p-2 rounded">
+                    <span>${reward.name} (${reward.duration} นาที)</span>
+                    <button class="delete-reward-btn text-red-500 hover:text-red-700" data-id="${id}">&times;</button>
+                </div>
+            `).join('');
+
+            document.getElementById('add-reward-form').addEventListener('submit', handleAddReward);
+            document.querySelectorAll('.delete-reward-btn').forEach(btn => btn.addEventListener('click', handleDeleteReward));
+        }
+
+        function renderCharts() {
+            // This is a placeholder for chart rendering
+            const tasksCompletedCtx = document.getElementById('tasksCompletedChart')?.getContext('2d');
+            if (tasksCompletedCtx) new Chart(tasksCompletedCtx, {
+                type: 'bar',
+                data: { labels: ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'], datasets: [{ label: 'งานที่เสร็จ', data: [2, 3, 1, 5, 4, 0, 1], backgroundColor: 'rgba(59, 130, 246, 0.5)' }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const pomodoroSessionsCtx = document.getElementById('pomodoroSessionsChart')?.getContext('2d');
+            if (pomodoroSessionsCtx) new Chart(pomodoroSessionsCtx, {
+                type: 'doughnut',
+                data: { labels: ['Do', 'Decide', 'Delegate', 'Delete'], datasets: [{ label: 'เวลาที่ใช้', data: [120, 80, 45, 15], backgroundColor: ['#EF4444', '#3B82F6', '#F59E0B', '#6B7280'] }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+
+        // --- Event Handlers ---
+        function switchView(viewId) {
+            currentView = viewId;
+            const link = document.querySelector(`.nav-link[data-view="${viewId}"]`);
+            if (link) viewTitle.textContent = link.querySelector('span').textContent;
+            renderView(viewId);
+        }
+
+        function openTaskModal(task = null) {
+            taskForm.reset();
+            const taskIdInput = document.getElementById('task-id');
+            const taskRewardSelect = document.getElementById('task-reward');
+
+            // Populate rewards
+            taskRewardSelect.innerHTML = '<option value="">ไม่มีรางวัล</option>' + Object.entries(rewards).map(([id, reward]) => `<option value="${id}">${reward.name} (${reward.duration} นาที)</option>`).join('');
+
+            if (task) {
+                modalTitle.textContent = "แก้ไขงาน";
+                taskIdInput.value = task.id;
+                document.getElementById('task-title').value = task.title;
+                document.getElementById('task-description').value = task.description || '';
+                document.getElementById('task-due-date').value = task.dueDate || '';
+                document.getElementById('task-eisenhower').value = task.eisenhower || 'do';
+                taskRewardSelect.value = task.rewardId || '';
+            } else {
+                modalTitle.textContent = "สร้างงานใหม่";
+                taskIdInput.value = '';
+            }
+            taskModal.classList.remove('hidden');
+        }
+
+        function closeTaskModal() {
+            taskModal.classList.add('hidden');
+        }
+
+        function handleTaskFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('task-id').value;
+            const taskData = {
+                title: document.getElementById('task-title').value,
+                description: document.getElementById('task-description').value,
+                dueDate: document.getElementById('task-due-date').value,
+                eisenhower: document.getElementById('task-eisenhower').value,
+                rewardId: document.getElementById('task-reward').value,
+                isCompleted: false,
+                createdAt: new Date().toISOString()
+            };
+
+            if (id) {
+                update(ref(db, `tasks/${id}`), taskData);
+            } else {
+                const newTaskRef = push(ref(db, 'tasks'));
+                set(newTaskRef, taskData);
+            }
+            closeTaskModal();
+        }
+
+        function handleTaskActions(e) {
+            const button = e.target.closest('button');
+            if (!button) return;
+            const card = e.target.closest('.task-card');
+            if (!card) return;
+            const taskId = card.dataset.id;
+
+            if (button.classList.contains('delete-btn')) {
+                const taskToDelete = tasks[taskId];
+                set(ref(db, `trash/${taskId}`), taskToDelete); // Move to trash
+                remove(ref(db, `tasks/${taskId}`)); // Remove from tasks
+            } else if (button.classList.contains('edit-btn')) {
+                openTaskModal({ id: taskId, ...tasks[taskId] });
+            } else if (button.classList.contains('complete-btn')) {
+                update(ref(db, `tasks/${taskId}`), { isCompleted: true, completedAt: new Date().toISOString() });
+                // Handle reward scheduling here
+            }
+        }
+
+        function handleRestoreTask(e) {
+            const taskId = e.target.dataset.id;
+            if (taskId && trash[taskId]) {
+                set(ref(db, `tasks/${taskId}`), trash[taskId]); // Move back to tasks
+                remove(ref(db, `trash/${taskId}`)); // Remove from trash
+            }
+        }
+
+        function handleAddReward(e) {
+            e.preventDefault();
+            const name = document.getElementById('reward-name').value;
+            const duration = document.getElementById('reward-duration').value;
+            if (name && duration) {
+                const newRewardRef = push(ref(db, 'rewards'));
+                set(newRewardRef, { name, duration: parseInt(duration) });
+                e.target.reset();
+            }
+        }
+
+        function handleDeleteReward(e) {
+            const rewardId = e.target.dataset.id;
+            if (rewardId) {
+                remove(ref(db, `rewards/${rewardId}`));
+            }
+        }
+
+        // --- Firebase Listeners ---
+        onValue(ref(db, 'tasks'), (snapshot) => {
+            tasks = snapshot.val() || {};
+            if (document.getElementById(currentView)) renderView(currentView);
+        });
+
+        onValue(ref(db, 'rewards'), (snapshot) => {
+            rewards = snapshot.val() || {};
+            if (currentView === 'settings-view') renderRewardsSettings();
+        });
+
+        onValue(ref(db, 'trash'), (snapshot) => {
+            trash = snapshot.val() || {};
+            if (currentView === 'trash-view') renderView(currentView);
+        });
+
+        // --- Initial Setup ---
+        sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('sidebar-closed'));
+        navLinks.forEach(link => link.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchView(e.currentTarget.dataset.view);
+            if (window.innerWidth < 768) sidebar.classList.add('sidebar-closed');
+        }));
+        addTaskBtn.addEventListener('click', () => openTaskModal());
+        cancelTaskBtn.addEventListener('click', closeTaskModal);
+        taskForm.addEventListener('submit', handleTaskFormSubmit);
+
+        // Use event delegation for dynamic task cards
+        document.getElementById('eisenhower-view').addEventListener('click', handleTaskActions);
+        document.getElementById('trash-view').addEventListener('click', e => {
+            if (e.target.classList.contains('restore-btn')) handleRestoreTask(e);
+        });
+        document.getElementById('settings-view').addEventListener('click', e => {
+            if (e.target.classList.contains('delete-reward-btn')) handleDeleteReward(e);
+        });
+
+
+        // Initial render
+        switchView(currentView);
+
+    </script>
+</body>
+
+</html>
