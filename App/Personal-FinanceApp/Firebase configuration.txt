@@ -1,0 +1,33 @@
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCJQ9hVsMFm5LYKPvyAA342XcBh4iAI9Ek",
+  authDomain: "create-app-e4028.firebaseapp.com",
+  databaseURL: "https://create-app-e4028-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "create-app-e4028",
+  storageBucket: "create-app-e4028.firebasestorage.app",
+  messagingSenderId: "612684670881",
+  appId: "1:612684670881:web:3650b675274176a8db8de0"
+};
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: 
+  authDomain: 
+  databaseURL: 
+  projectId: 
+  storageBucket: 
+  messagingSenderId: 
+  appId: 
+};
+
+
+// Firebase Configuration
+  const firebaseConfig = {
+  apiKey: "",//เดี๋ยวผมใส่ค่า configurarion เอง
+  authDomain: "",//เดี๋ยวผมใส่ค่า configurarion เอง
+  databaseURL: "",//เดี๋ยวผมใส่ค่า configurarion เอง
+  projectId: "",//เดี๋ยวผมใส่ค่า configurarion เอง
+  storageBucket: "",//เดี๋ยวผมใส่ค่า configurarion เอง
+  messagingSenderId: "",//เดี๋ยวผมใส่ค่า configurarion เอง
+  appId: ""//เดี๋ยวผมใส่ค่า configurarion เอง
+};
