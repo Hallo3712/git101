@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการรายรับรายจ่าย</title>
+    <title>Task & Time Management App</title>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -14,9 +14,13 @@
             box-sizing: border-box;
         }
 
-        .tab-active {
-            background-color: #3b82f6;
-            color: white;
+        .sidebar {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
         }
 
         .fade-in {
@@ -34,243 +38,363 @@
                 transform: translateY(0);
             }
         }
+
+        .priority-do {
+            border-left: 4px solid #ef4444;
+        }
+
+        .priority-decide {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .priority-delegate {
+            border-left: 4px solid #3b82f6;
+        }
+
+        .priority-delete {
+            border-left: 4px solid #6b7280;
+        }
+
+        .habit-streak {
+            background: linear-gradient(45deg, #10b981, #059669);
+        }
+
+        .pomodoro-active {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .time-block {
+            min-height: 60px;
+            border: 2px dashed #d1d5db;
+            transition: all 0.3s ease;
+        }
+
+        .time-block.occupied {
+            border: 2px solid #3b82f6;
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        }
+
+        .time-block.reward {
+            border: 2px solid #10b981;
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+        }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-    <div class="container mx-auto px-4 py-6 max-w-6xl">
-        <!-- Header -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h1 class="text-3xl font-bold text-gray-800 text-center">💰 จัดการรายรับรายจ่าย</h1>
-            <div class="flex justify-center mt-4 space-x-2">
-                <select id="monthSelect"
-                    class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </select>
-                <select id="yearSelect"
-                    class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </select>
-            </div>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg">
+        <div class="flex items-center justify-between p-4 border-b">
+            <h2 class="text-xl font-bold text-gray-800">📋 Task Manager</h2>
+            <button id="closeSidebar" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
         </div>
-
-        <!-- Navigation Tabs -->
-        <div class="bg-white rounded-lg shadow-lg mb-6">
-            <div class="flex border-b">
-                <button class="tab-btn flex-1 py-3 px-4 text-center font-medium rounded-tl-lg tab-active"
-                    data-tab="dashboard">
-                    📊 แดชบอร์ด
-                </button>
-                <button class="tab-btn flex-1 py-3 px-4 text-center font-medium" data-tab="add">
-                    ➕ เพิ่มรายการ
-                </button>
-                <button class="tab-btn flex-1 py-3 px-4 text-center font-medium" data-tab="manage">
-                    📝 จัดการรายการ
-                </button>
-                <button class="tab-btn flex-1 py-3 px-4 text-center font-medium" data-tab="config">
-                    ⚙️ ตั้งค่า
-                </button>
-                <button class="tab-btn flex-1 py-3 px-4 text-center font-medium rounded-tr-lg" data-tab="yearly">
-                    📈 สรุปรายปี
-                </button>
-            </div>
-        </div>
-
-        <!-- Dashboard Tab -->
-        <div id="dashboard-tab" class="tab-content fade-in">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <!-- Summary Cards -->
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">💵 สรุปรายรับรายจ่าย</h3>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                            <span class="text-green-700 font-medium">รายรับรวม</span>
-                            <span id="totalIncome" class="text-green-700 font-bold text-lg">฿0</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                            <span class="text-red-700 font-medium">รายจ่ายรวม</span>
-                            <span id="totalExpense" class="text-red-700 font-bold text-lg">฿0</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                            <span class="text-blue-700 font-medium">คงเหลือ</span>
-                            <span id="balance" class="text-blue-700 font-bold text-lg">฿0</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Chart -->
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">📊 กราฟสัดส่วน</h3>
-                    <div class="relative h-64">
-                        <canvas id="pieChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Transactions -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">📋 รายการล่าสุด</h3>
-                <div id="recentTransactions" class="space-y-2">
-                </div>
-            </div>
-        </div>
-
-        <!-- Add Transaction Tab -->
-        <div id="add-tab" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-bold text-gray-800 mb-6">➕ เพิ่มรายการใหม่</h3>
-                <form id="transactionForm" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">ประเภท</label>
-                            <select id="transactionType"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required>
-                                <option value="income">รายรับ</option>
-                                <option value="expense">รายจ่าย</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">หมวดหมู่</label>
-                            <select id="categorySelect"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">จำนวนเงิน</label>
-                            <input type="number" id="amount"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="0" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">วันที่</label>
-                            <input type="date" id="transactionDate"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">รายละเอียด</label>
-                        <input type="text" id="description"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="รายละเอียดเพิ่มเติม">
-                    </div>
-                    <button type="submit"
-                        class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-200 font-medium">
-                        💾 บันทึกรายการ
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Manage Transactions Tab -->
-        <div id="manage-tab" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-bold text-gray-800 mb-6">📝 จัดการรายการ</h3>
-                <div id="transactionsList" class="space-y-3">
-                </div>
-            </div>
-        </div>
-
-        <!-- Config Tab -->
-        <div id="config-tab" class="tab-content hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Income Categories -->
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">💰 หมวดหมู่รายรับ</h3>
-                    <div class="mb-4">
-                        <div class="flex gap-2">
-                            <input type="text" id="newIncomeCategory"
-                                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="ชื่อหมวดหมู่ใหม่">
-                            <button onclick="addCategory('income')"
-                                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200">
-                                ➕ เพิ่ม
-                            </button>
-                        </div>
-                    </div>
-                    <div id="incomeCategoriesList" class="space-y-2">
-                    </div>
-                </div>
-
-                <!-- Expense Categories -->
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">💸 หมวดหมู่รายจ่าย</h3>
-                    <div class="mb-4">
-                        <div class="flex gap-2">
-                            <input type="text" id="newExpenseCategory"
-                                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="ชื่อหมวดหมู่ใหม่">
-                            <button onclick="addCategory('expense')"
-                                class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200">
-                                ➕ เพิ่ม
-                            </button>
-                        </div>
-                    </div>
-                    <div id="expenseCategoriesList" class="space-y-2">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Yearly Summary Tab -->
-        <div id="yearly-tab" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-bold text-gray-800 mb-6">📈 สรุปรายปี</h3>
-                <div class="mb-4">
-                    <select id="yearlySelect"
-                        class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </select>
-                </div>
-                <div id="yearlyChart" class="mb-6">
-                    <canvas id="yearlyBarChart" height="100"></canvas>
-                </div>
-                <div id="yearlySummary" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                </div>
+        <nav class="p-4">
+            <ul class="space-y-2">
+                <li><a href="#" class="nav-item flex items-center p-3 rounded-lg hover:bg-gray-100"
+                        data-view="eisenhower">🎯 Eisenhower Matrix</a></li>
+                <li><a href="#" class="nav-item flex items-center p-3 rounded-lg hover:bg-gray-100" data-view="daily">📅
+                        แผนงานวันนี้</a></li>
+                <li><a href="#" class="nav-item flex items-center p-3 rounded-lg hover:bg-gray-100"
+                        data-view="calendar">🗓️ ปฏิทิน & Time Blocking</a></li>
+                <li><a href="#" class="nav-item flex items-center p-3 rounded-lg hover:bg-gray-100"
+                        data-view="habits">🎯 ติดตามนิสัย</a></li>
+                <li><a href="#" class="nav-item flex items-center p-3 rounded-lg hover:bg-gray-100" data-view="stats">📊
+                        สถิติและรายงาน</a></li>
+                <li><a href="#" class="nav-item flex items-center p-3 rounded-lg hover:bg-gray-100"
+                        data-view="rewards">🎁 จัดการรางวัล</a></li>
+                <li><a href="#" class="nav-item flex items-center p-3 rounded-lg hover:bg-gray-100"
+                        data-view="trash">🗑️ ถังขยะ</a></li>
+                <li><a href="#" class="nav-item flex items-center p-3 rounded-lg hover:bg-gray-100"
+                        data-view="settings">⚙️ ตั้งค่า</a></li>
+            </ul>
+        </nav>
+        <div class="absolute bottom-4 left-4 right-4">
+            <div id="syncStatus" class="flex items-center text-sm text-gray-600">
+                <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                <span>ซิงค์แล้ว</span>
             </div>
         </div>
     </div>
 
-    <!-- Edit Modal -->
-    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">✏️ แก้ไขรายการ</h3>
-            <form id="editForm" class="space-y-4">
-                <input type="hidden" id="editId">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">ประเภท</label>
-                    <select id="editType"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="income">รายรับ</option>
-                        <option value="expense">รายจ่าย</option>
-                    </select>
+    <!-- Overlay -->
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
+
+    <!-- Main Content -->
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="flex items-center justify-between p-4">
+                <button id="menuBtn" class="text-gray-600 hover:text-gray-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                <h1 id="pageTitle" class="text-xl font-bold text-gray-800">🎯 Eisenhower Matrix</h1>
+                <div class="flex items-center space-x-4">
+                    <!-- Pomodoro Timer -->
+                    <div id="pomodoroTimer" class="flex items-center space-x-2 bg-red-50 px-3 py-2 rounded-lg">
+                        <span id="timerDisplay" class="font-mono text-red-700">25:00</span>
+                        <button id="timerBtn" class="text-red-600 hover:text-red-800">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m6-6V7a3 3 0 00-3-3H6a3 3 0 00-3 3v1">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">หมวดหมู่</label>
-                    <select id="editCategory"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </select>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="p-4">
+            <!-- Eisenhower Matrix View -->
+            <div id="eisenhower-view" class="view-content">
+                <div class="mb-6">
+                    <button id="addTaskBtn"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200">
+                        ➕ เพิ่มงานใหม่
+                    </button>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">จำนวนเงิน</label>
-                    <input type="number" id="editAmount"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Do (Urgent + Important) -->
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-bold text-red-700 mb-4 flex items-center">
+                            🔥 DO - เร่งด่วน & สำคัญ
+                        </h3>
+                        <div id="do-tasks" class="space-y-3 min-h-32">
+                        </div>
+                    </div>
+
+                    <!-- Decide (Not Urgent + Important) -->
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-bold text-yellow-700 mb-4 flex items-center">
+                            📋 DECIDE - สำคัญ & ไม่เร่งด่วน
+                        </h3>
+                        <div id="decide-tasks" class="space-y-3 min-h-32">
+                        </div>
+                    </div>
+
+                    <!-- Delegate (Urgent + Not Important) -->
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-bold text-blue-700 mb-4 flex items-center">
+                            👥 DELEGATE - เร่งด่วน & ไม่สำคัญ
+                        </h3>
+                        <div id="delegate-tasks" class="space-y-3 min-h-32">
+                        </div>
+                    </div>
+
+                    <!-- Delete (Not Urgent + Not Important) -->
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                            🗑️ DELETE - ไม่เร่งด่วน & ไม่สำคัญ
+                        </h3>
+                        <div id="delete-tasks" class="space-y-3 min-h-32">
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Daily Plan View -->
+            <div id="daily-view" class="view-content hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">📅 แผนงานวันนี้ (Ivy Lee Method)</h3>
+                    <p class="text-gray-600 mb-4">เลือก 6 งานที่สำคัญที่สุดสำหรับวันนี้ และจัดเรียงตามลำดับความสำคัญ</p>
+                    <div id="dailyTasks" class="space-y-3">
+                    </div>
+                    <button id="planDayBtn"
+                        class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200">
+                        📋 วางแผนวันนี้
+                    </button>
+                </div>
+            </div>
+
+            <!-- Calendar & Time Blocking View -->
+            <div id="calendar-view" class="view-content hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-gray-800">🗓️ ปฏิทิน & Time Blocking</h3>
+                        <div class="flex space-x-2">
+                            <input type="date" id="calendarDate" class="px-3 py-2 border rounded-lg">
+                        </div>
+                    </div>
+                    <div id="timeBlocks" class="grid grid-cols-1 gap-2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Habits View -->
+            <div id="habits-view" class="view-content hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">🎯 ติดตามนิสัย</h3>
+                        <button id="addHabitBtn"
+                            class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200">
+                            ➕ เพิ่มนิสัยใหม่
+                        </button>
+                    </div>
+                    <div id="habitsList" class="space-y-4">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats View -->
+            <div id="stats-view" class="view-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">📊 สถิติงาน</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span>งานที่เสร็จสิ้นวันนี้</span>
+                                <span id="todayCompleted" class="font-bold text-green-600">0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>งานที่เสร็จสิ้นสัปดาห์นี้</span>
+                                <span id="weekCompleted" class="font-bold text-blue-600">0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>เวลาโฟกัสรวมวันนี้</span>
+                                <span id="todayFocusTime" class="font-bold text-purple-600">0 นาที</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">📈 กราฟประสิทธิภาพ</h3>
+                        <canvas id="performanceChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rewards View -->
+            <div id="rewards-view" class="view-content hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">🎁 จัดการรางวัล</h3>
+                        <button id="addRewardBtn"
+                            class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition duration-200">
+                            ➕ เพิ่มรางวัลใหม่
+                        </button>
+                    </div>
+                    <div id="rewardsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trash View -->
+            <div id="trash-view" class="view-content hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">🗑️ ถังขยะ</h3>
+                        <button id="emptyTrashBtn"
+                            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200">
+                            🗑️ ล้างถังขยะ
+                        </button>
+                    </div>
+                    <div id="trashList" class="space-y-3">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settings-view" class="view-content hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6">⚙️ ตั้งค่า</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">เวลา Pomodoro (นาที)</label>
+                            <input type="number" id="pomodoroTime" class="w-full px-3 py-2 border rounded-lg" value="25"
+                                min="1" max="60">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">เวลาพักสั้น (นาที)</label>
+                            <input type="number" id="shortBreakTime" class="w-full px-3 py-2 border rounded-lg"
+                                value="5" min="1" max="30">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">เวลาพักยาว (นาที)</label>
+                            <input type="number" id="longBreakTime" class="w-full px-3 py-2 border rounded-lg"
+                                value="15" min="1" max="60">
+                        </div>
+                        <button id="saveSettingsBtn"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200">
+                            💾 บันทึกการตั้งค่า
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Task Modal -->
+    <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-screen overflow-y-auto">
+            <h3 id="taskModalTitle" class="text-lg font-bold text-gray-800 mb-4">➕ เพิ่มงานใหม่</h3>
+            <form id="taskForm" class="space-y-4">
+                <input type="hidden" id="taskId">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">วันที่</label>
-                    <input type="date" id="editDate"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">ชื่องาน</label>
+                    <input type="text" id="taskTitle" class="w-full px-3 py-2 border rounded-lg" required>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">รายละเอียด</label>
-                    <input type="text" id="editDescription"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <textarea id="taskDescription" class="w-full px-3 py-2 border rounded-lg" rows="3"></textarea>
                 </div>
-                <div class="flex gap-2">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">วันที่กำหนดส่ง</label>
+                    <input type="datetime-local" id="taskDueDate" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">ลำดับความสำคัญ</label>
+                    <select id="taskPriority" class="w-full px-3 py-2 border rounded-lg">
+                        <option value="do">🔥 DO - เร่งด่วน & สำคัญ</option>
+                        <option value="decide">📋 DECIDE - สำคัญ & ไม่เร่งด่วน</option>
+                        <option value="delegate">👥 DELEGATE - เร่งด่วน & ไม่สำคัญ</option>
+                        <option value="delete">🗑️ DELETE - ไม่เร่งด่วน & ไม่สำคัญ</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">งานซ้ำ</label>
+                    <select id="taskRecurring" class="w-full px-3 py-2 border rounded-lg">
+                        <option value="none">ไม่ซ้ำ</option>
+                        <option value="daily">รายวัน</option>
+                        <option value="weekly">รายสัปดาห์</option>
+                        <option value="monthly">รายเดือน</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">เวลาที่คาดว่าจะใช้ (นาที)</label>
+                    <input type="number" id="taskEstimatedTime" class="w-full px-3 py-2 border rounded-lg" min="1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">รางวัลหลังเสร็จงาน</label>
+                    <select id="taskReward" class="w-full px-3 py-2 border rounded-lg">
+                        <option value="">ไม่มีรางวัล</option>
+                    </select>
+                </div>
+                <div class="flex space-x-2">
                     <button type="submit"
                         class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200">
                         💾 บันทึก
                     </button>
-                    <button type="button" onclick="closeEditModal()"
+                    <button type="button" id="closeTaskModal"
                         class="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-200">
                         ❌ ยกเลิก
                     </button>
@@ -279,16 +403,109 @@
         </div>
     </div>
 
+    <!-- Habit Modal -->
+    <div id="habitModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">🎯 เพิ่มนิสัยใหม่</h3>
+            <form id="habitForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อนิสัย</label>
+                    <input type="text" id="habitName" class="w-full px-3 py-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">เป้าหมายต่อวัน</label>
+                    <input type="number" id="habitTarget" class="w-full px-3 py-2 border rounded-lg" min="1" value="1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">หน่วย</label>
+                    <input type="text" id="habitUnit" class="w-full px-3 py-2 border rounded-lg"
+                        placeholder="ครั้ง, นาที, หน้า">
+                </div>
+                <div class="flex space-x-2">
+                    <button type="submit"
+                        class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition duration-200">
+                        💾 บันทึก
+                    </button>
+                    <button type="button" id="closeHabitModal"
+                        class="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-200">
+                        ❌ ยกเลิก
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reward Modal -->
+    <div id="rewardModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">🎁 เพิ่มรางวัลใหม่</h3>
+            <form id="rewardForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อรางวัล</label>
+                    <input type="text" id="rewardName" class="w-full px-3 py-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">ระยะเวลา (นาที)</label>
+                    <input type="number" id="rewardDuration" class="w-full px-3 py-2 border rounded-lg" min="1"
+                        value="10">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">รายละเอียด</label>
+                    <textarea id="rewardDescription" class="w-full px-3 py-2 border rounded-lg" rows="2"></textarea>
+                </div>
+                <div class="flex space-x-2">
+                    <button type="submit"
+                        class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-200">
+                        💾 บันทึก
+                    </button>
+                    <button type="button" id="closeRewardModal"
+                        class="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-200">
+                        ❌ ยกเลิก
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Daily Plan Modal -->
+    <div id="dailyPlanModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-screen overflow-y-auto">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">📋 วางแผนงานวันนี้</h3>
+            <p class="text-gray-600 mb-4">เลือก 6 งานที่สำคัญที่สุดและจัดเรียงตามลำดับความสำคัญ</p>
+            <div id="availableTasks" class="mb-6">
+                <h4 class="font-medium text-gray-700 mb-2">งานที่สามารถเลือกได้:</h4>
+                <div id="taskSelection" class="space-y-2 max-h-60 overflow-y-auto">
+                </div>
+            </div>
+            <div id="selectedTasks" class="mb-6">
+                <h4 class="font-medium text-gray-700 mb-2">งานที่เลือกแล้ว (ลากเพื่อจัดเรียง):</h4>
+                <div id="dailyTasksList"
+                    class="space-y-2 min-h-32 border-2 border-dashed border-gray-300 p-4 rounded-lg">
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <button id="saveDailyPlan"
+                    class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition duration-200">
+                    💾 บันทึกแผนงาน
+                </button>
+                <button id="closeDailyPlanModal"
+                    class="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-200">
+                    ❌ ยกเลิก
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Firebase Configuration
         const firebaseConfig = {
-            apiKey: "",//เดี๋ยวผมใส่ค่า configurarion เอง
-            authDomain: "",//เดี๋ยวผมใส่ค่า configurarion เอง
-            databaseURL: "",//เดี๋ยวผมใส่ค่า configurarion เอง
-            projectId: "",//เดี๋ยวผมใส่ค่า configurarion เอง
-            storageBucket: "",//เดี๋ยวผมใส่ค่า configurarion เอง
-            messagingSenderId: "",//เดี๋ยวผมใส่ค่า configurarion เอง
-            appId: ""//เดี๋ยวผมใส่ค่า configurarion เอง
+            apiKey: "AIzaSyCJQ9hVsMFm5LYKPvyAA342XcBh4iAI9Ek",
+            authDomain: "create-app-e4028.firebaseapp.com",
+            databaseURL: "https://create-app-e4028-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "create-app-e4028",
+            storageBucket: "create-app-e4028.firebasestorage.app",
+            messagingSenderId: "612684670881",
+            appId: "1:612684670881:web:3650b675274176a8db8de0"
         };
 
         // Initialize Firebase
@@ -296,545 +513,843 @@
         const database = firebase.database();
 
         // Global variables
-        let currentMonth = new Date().getMonth() + 1;
-        let currentYear = new Date().getFullYear();
-        let transactions = {};
-        let categories = {
-            income: ['เงินเดือน', 'โบนัส', 'รายได้เสริม', 'ดอกเบี้ย'],
-            expense: ['อาหาร', 'ค่าเดินทาง', 'ค่าบ้าน', 'ช้อปปิ้ง', 'สุขภาพ', 'บันเทิง']
+        let currentView = 'eisenhower';
+        let tasks = {};
+        let habits = {};
+        let rewards = {};
+        let dailyPlan = [];
+        let trashedTasks = {};
+        let settings = {
+            pomodoroTime: 25,
+            shortBreakTime: 5,
+            longBreakTime: 15
         };
-        let pieChart = null;
-        let yearlyChart = null;
+
+        // Pomodoro Timer
+        let pomodoroInterval = null;
+        let pomodoroTimeLeft = 25 * 60; // 25 minutes in seconds
+        let isPomodoroRunning = false;
+
+        // Time tracking
+        let activeTaskId = null;
+        let trackingStartTime = null;
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function () {
             initializeApp();
             setupEventListeners();
-            loadCategories();
-            loadTransactions();
+            loadData();
         });
 
         function initializeApp() {
-            // Setup date selectors
-            setupDateSelectors();
-            // Set today's date as default
-            document.getElementById('transactionDate').value = new Date().toISOString().split('T')[0];
-            // Load categories into select
-            updateCategorySelect();
-        }
+            // Set today's date for calendar
+            document.getElementById('calendarDate').value = new Date().toISOString().split('T')[0];
 
-        function setupDateSelectors() {
-            const monthSelect = document.getElementById('monthSelect');
-            const yearSelect = document.getElementById('yearSelect');
-            const yearlySelect = document.getElementById('yearlySelect');
+            // Initialize Pomodoro display
+            updatePomodoroDisplay();
 
-            // Months
-            const months = [
-                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-            ];
-
-            months.forEach((month, index) => {
-                const option = document.createElement('option');
-                option.value = index + 1;
-                option.textContent = month;
-                if (index + 1 === currentMonth) option.selected = true;
-                monthSelect.appendChild(option);
-            });
-
-            // Years
-            for (let year = currentYear - 5; year <= currentYear + 1; year++) {
-                const option1 = document.createElement('option');
-                option1.value = year;
-                option1.textContent = year;
-                if (year === currentYear) option1.selected = true;
-                yearSelect.appendChild(option1);
-
-                const option2 = document.createElement('option');
-                option2.value = year;
-                option2.textContent = year;
-                if (year === currentYear) option2.selected = true;
-                yearlySelect.appendChild(option2);
-            }
+            // Generate time blocks for calendar
+            generateTimeBlocks();
         }
 
         function setupEventListeners() {
-            // Tab switching
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    switchTab(this.dataset.tab);
+            // Sidebar navigation
+            document.getElementById('menuBtn').addEventListener('click', openSidebar);
+            document.getElementById('closeSidebar').addEventListener('click', closeSidebar);
+            document.getElementById('overlay').addEventListener('click', closeSidebar);
+
+            // Navigation items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    switchView(this.dataset.view);
+                    closeSidebar();
                 });
             });
 
-            // Date selectors
-            document.getElementById('monthSelect').addEventListener('change', function () {
-                currentMonth = parseInt(this.value);
-                loadTransactions();
-            });
+            // Modal controls
+            document.getElementById('addTaskBtn').addEventListener('click', () => openTaskModal());
+            document.getElementById('closeTaskModal').addEventListener('click', closeTaskModal);
+            document.getElementById('taskForm').addEventListener('submit', saveTask);
 
-            document.getElementById('yearSelect').addEventListener('change', function () {
-                currentYear = parseInt(this.value);
-                loadTransactions();
-            });
+            document.getElementById('addHabitBtn').addEventListener('click', () => openHabitModal());
+            document.getElementById('closeHabitModal').addEventListener('click', closeHabitModal);
+            document.getElementById('habitForm').addEventListener('submit', saveHabit);
 
-            document.getElementById('yearlySelect').addEventListener('change', function () {
-                loadYearlySummary(parseInt(this.value));
-            });
+            document.getElementById('addRewardBtn').addEventListener('click', () => openRewardModal());
+            document.getElementById('closeRewardModal').addEventListener('click', closeRewardModal);
+            document.getElementById('rewardForm').addEventListener('submit', saveReward);
 
-            // Transaction type change
-            document.getElementById('transactionType').addEventListener('change', updateCategorySelect);
-            document.getElementById('editType').addEventListener('change', updateEditCategorySelect);
+            document.getElementById('planDayBtn').addEventListener('click', () => openDailyPlanModal());
+            document.getElementById('closeDailyPlanModal').addEventListener('click', closeDailyPlanModal);
+            document.getElementById('saveDailyPlan').addEventListener('click', saveDailyPlan);
 
-            // Forms
-            document.getElementById('transactionForm').addEventListener('submit', addTransaction);
-            document.getElementById('editForm').addEventListener('submit', updateTransaction);
+            // Pomodoro timer
+            document.getElementById('timerBtn').addEventListener('click', togglePomodoro);
+
+            // Settings
+            document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+
+            // Calendar date change
+            document.getElementById('calendarDate').addEventListener('change', generateTimeBlocks);
+
+            // Trash
+            document.getElementById('emptyTrashBtn').addEventListener('click', emptyTrash);
         }
 
-        function switchTab(tabName) {
-            // Update tab buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('tab-active');
-                btn.classList.add('text-gray-600', 'hover:text-gray-800');
+        // Data Management
+        function loadData() {
+            // Load tasks
+            database.ref('tasks').on('value', (snapshot) => {
+                tasks = snapshot.val() || {};
+                renderTasks();
+                updateStats();
             });
-            document.querySelector(`[data-tab="${tabName}"]`).classList.add('tab-active');
 
-            // Show/hide tab content
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.add('hidden');
+            // Load habits
+            database.ref('habits').on('value', (snapshot) => {
+                habits = snapshot.val() || {};
+                renderHabits();
             });
-            document.getElementById(`${tabName}-tab`).classList.remove('hidden');
 
-            // Load specific tab data
-            if (tabName === 'dashboard') {
-                updateDashboard();
-            } else if (tabName === 'manage') {
-                displayTransactionsList();
-            } else if (tabName === 'config') {
-                displayCategories();
-            } else if (tabName === 'yearly') {
-                loadYearlySummary(currentYear);
-            }
-        }
+            // Load rewards
+            database.ref('rewards').on('value', (snapshot) => {
+                rewards = snapshot.val() || {};
+                renderRewards();
+                updateRewardSelect();
+            });
 
-        // Categories Management
-        function loadCategories() {
-            database.ref('categories').on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    categories = data;
-                } else {
-                    // Initialize default categories
-                    database.ref('categories').set(categories);
+            // Load daily plan
+            database.ref('dailyPlan').on('value', (snapshot) => {
+                dailyPlan = snapshot.val() || [];
+                renderDailyPlan();
+            });
+
+            // Load trash
+            database.ref('trash').on('value', (snapshot) => {
+                trashedTasks = snapshot.val() || {};
+                renderTrash();
+            });
+
+            // Load settings
+            database.ref('settings').on('value', (snapshot) => {
+                const loadedSettings = snapshot.val();
+                if (loadedSettings) {
+                    settings = loadedSettings;
+                    updateSettingsUI();
                 }
-                updateCategorySelect();
-                displayCategories();
+            });
+
+            updateSyncStatus(true);
+        }
+
+        function updateSyncStatus(synced) {
+            const statusEl = document.getElementById('syncStatus');
+            if (synced) {
+                statusEl.innerHTML = '<div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div><span>ซิงค์แล้ว</span>';
+            } else {
+                statusEl.innerHTML = '<div class="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div><span>กำลังซิงค์...</span>';
+            }
+        }
+
+        // Sidebar Management
+        function openSidebar() {
+            document.getElementById('sidebar').classList.add('open');
+            document.getElementById('overlay').classList.remove('hidden');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('overlay').classList.add('hidden');
+        }
+
+        // View Management
+        function switchView(viewName) {
+            currentView = viewName;
+
+            // Hide all views
+            document.querySelectorAll('.view-content').forEach(view => {
+                view.classList.add('hidden');
+            });
+
+            // Show selected view
+            document.getElementById(`${viewName}-view`).classList.remove('hidden');
+
+            // Update page title
+            const titles = {
+                'eisenhower': '🎯 Eisenhower Matrix',
+                'daily': '📅 แผนงานวันนี้',
+                'calendar': '🗓️ ปฏิทิน & Time Blocking',
+                'habits': '🎯 ติดตามนิสัย',
+                'stats': '📊 สถิติและรายงาน',
+                'rewards': '🎁 จัดการรางวัล',
+                'trash': '🗑️ ถังขยะ',
+                'settings': '⚙️ ตั้งค่า'
+            };
+
+            document.getElementById('pageTitle').textContent = titles[viewName];
+
+            // Load view-specific data
+            if (viewName === 'stats') {
+                renderStats();
+            } else if (viewName === 'calendar') {
+                generateTimeBlocks();
+            }
+        }
+
+        // Task Management
+        function openTaskModal(taskId = null) {
+            const modal = document.getElementById('taskModal');
+            const form = document.getElementById('taskForm');
+
+            if (taskId) {
+                const task = tasks[taskId];
+                document.getElementById('taskModalTitle').textContent = '✏️ แก้ไขงาน';
+                document.getElementById('taskId').value = taskId;
+                document.getElementById('taskTitle').value = task.title;
+                document.getElementById('taskDescription').value = task.description || '';
+                document.getElementById('taskDueDate').value = task.dueDate || '';
+                document.getElementById('taskPriority').value = task.priority;
+                document.getElementById('taskRecurring').value = task.recurring || 'none';
+                document.getElementById('taskEstimatedTime').value = task.estimatedTime || '';
+                document.getElementById('taskReward').value = task.rewardId || '';
+            } else {
+                document.getElementById('taskModalTitle').textContent = '➕ เพิ่มงานใหม่';
+                form.reset();
+                document.getElementById('taskId').value = '';
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeTaskModal() {
+            document.getElementById('taskModal').classList.add('hidden');
+            document.getElementById('taskModal').classList.remove('flex');
+        }
+
+        function saveTask(e) {
+            e.preventDefault();
+
+            const taskId = document.getElementById('taskId').value || Date.now().toString();
+            const taskData = {
+                title: document.getElementById('taskTitle').value,
+                description: document.getElementById('taskDescription').value,
+                dueDate: document.getElementById('taskDueDate').value,
+                priority: document.getElementById('taskPriority').value,
+                recurring: document.getElementById('taskRecurring').value,
+                estimatedTime: parseInt(document.getElementById('taskEstimatedTime').value) || 0,
+                rewardId: document.getElementById('taskReward').value,
+                completed: tasks[taskId]?.completed || false,
+                createdAt: tasks[taskId]?.createdAt || Date.now(),
+                timeSpent: tasks[taskId]?.timeSpent || 0,
+                subtasks: tasks[taskId]?.subtasks || []
+            };
+
+            database.ref(`tasks/${taskId}`).set(taskData);
+            closeTaskModal();
+        }
+
+        function toggleTask(taskId) {
+            const task = tasks[taskId];
+            const newStatus = !task.completed;
+
+            database.ref(`tasks/${taskId}/completed`).set(newStatus);
+            database.ref(`tasks/${taskId}/completedAt`).set(newStatus ? Date.now() : null);
+
+            // If task is completed and has a reward, schedule it
+            if (newStatus && task.rewardId && rewards[task.rewardId]) {
+                scheduleReward(task.rewardId);
+            }
+        }
+
+        function deleteTask(taskId) {
+            if (confirm('ต้องการลบงานนี้หรือไม่?')) {
+                const task = tasks[taskId];
+                database.ref(`trash/${taskId}`).set({
+                    ...task,
+                    deletedAt: Date.now()
+                });
+                database.ref(`tasks/${taskId}`).remove();
+            }
+        }
+
+        function startTracking(taskId) {
+            if (activeTaskId) {
+                stopTracking();
+            }
+
+            activeTaskId = taskId;
+            trackingStartTime = Date.now();
+
+            // Update UI
+            document.querySelector(`[data-task-id="${taskId}"] .tracking-btn`).textContent = '⏹️ หยุด';
+            document.querySelector(`[data-task-id="${taskId}"] .tracking-btn`).classList.add('bg-red-500', 'hover:bg-red-600');
+            document.querySelector(`[data-task-id="${taskId}"] .tracking-btn`).classList.remove('bg-green-500', 'hover:bg-green-600');
+        }
+
+        function stopTracking() {
+            if (!activeTaskId || !trackingStartTime) return;
+
+            const timeSpent = Math.floor((Date.now() - trackingStartTime) / 1000 / 60); // minutes
+            const currentTimeSpent = tasks[activeTaskId].timeSpent || 0;
+
+            database.ref(`tasks/${activeTaskId}/timeSpent`).set(currentTimeSpent + timeSpent);
+
+            // Update UI
+            document.querySelector(`[data-task-id="${activeTaskId}"] .tracking-btn`).textContent = '▶️ เริ่ม';
+            document.querySelector(`[data-task-id="${activeTaskId}"] .tracking-btn`).classList.remove('bg-red-500', 'hover:bg-red-600');
+            document.querySelector(`[data-task-id="${activeTaskId}"] .tracking-btn`).classList.add('bg-green-500', 'hover:bg-green-600');
+
+            activeTaskId = null;
+            trackingStartTime = null;
+        }
+
+        function renderTasks() {
+            const priorities = ['do', 'decide', 'delegate', 'delete'];
+
+            priorities.forEach(priority => {
+                const container = document.getElementById(`${priority}-tasks`);
+                container.innerHTML = '';
+
+                const priorityTasks = Object.entries(tasks).filter(([id, task]) =>
+                    task.priority === priority && !task.completed
+                );
+
+                priorityTasks.forEach(([id, task]) => {
+                    const taskEl = createTaskElement(id, task);
+                    container.appendChild(taskEl);
+                });
             });
         }
 
-        function addCategory(type) {
-            const input = document.getElementById(`new${type.charAt(0).toUpperCase() + type.slice(1)}Category`);
-            const categoryName = input.value.trim();
+        function createTaskElement(id, task) {
+            const div = document.createElement('div');
+            div.className = `priority-${task.priority} bg-white p-4 rounded-lg shadow border-l-4`;
+            div.setAttribute('data-task-id', id);
 
-            if (categoryName && !categories[type].includes(categoryName)) {
-                categories[type].push(categoryName);
-                database.ref(`categories/${type}`).set(categories[type]);
-                input.value = '';
+            const isTracking = activeTaskId === id;
+            const timeSpentText = task.timeSpent ? `${task.timeSpent} นาที` : '0 นาที';
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-medium text-gray-800 flex-1">${task.title}</h4>
+                    <div class="flex space-x-1 ml-2">
+                        <button onclick="toggleTask('${id}')" class="text-green-600 hover:text-green-800 text-sm">
+                            ✅
+                        </button>
+                        <button onclick="openTaskModal('${id}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                            ✏️
+                        </button>
+                        <button onclick="deleteTask('${id}')" class="text-red-600 hover:text-red-800 text-sm">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                ${task.description ? `<p class="text-gray-600 text-sm mb-2">${task.description}</p>` : ''}
+                ${task.dueDate ? `<p class="text-gray-500 text-xs mb-2">📅 ${new Date(task.dueDate).toLocaleString('th-TH')}</p>` : ''}
+                <div class="flex justify-between items-center text-xs text-gray-500">
+                    <span>⏱️ ${timeSpentText}</span>
+                    <button onclick="${isTracking ? 'stopTracking()' : `startTracking('${id}')`}" 
+                            class="tracking-btn px-2 py-1 rounded text-white text-xs ${isTracking ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}">
+                        ${isTracking ? '⏹️ หยุด' : '▶️ เริ่ม'}
+                    </button>
+                </div>
+            `;
+
+            return div;
+        }
+
+        // Habit Management
+        function openHabitModal() {
+            document.getElementById('habitModal').classList.remove('hidden');
+            document.getElementById('habitModal').classList.add('flex');
+        }
+
+        function closeHabitModal() {
+            document.getElementById('habitModal').classList.add('hidden');
+            document.getElementById('habitModal').classList.remove('flex');
+        }
+
+        function saveHabit(e) {
+            e.preventDefault();
+
+            const habitId = Date.now().toString();
+            const habitData = {
+                name: document.getElementById('habitName').value,
+                target: parseInt(document.getElementById('habitTarget').value),
+                unit: document.getElementById('habitUnit').value,
+                createdAt: Date.now(),
+                streak: 0,
+                completions: {}
+            };
+
+            database.ref(`habits/${habitId}`).set(habitData);
+            closeHabitModal();
+            document.getElementById('habitForm').reset();
+        }
+
+        function updateHabitProgress(habitId, date, value) {
+            database.ref(`habits/${habitId}/completions/${date}`).set(value);
+
+            // Update streak
+            calculateHabitStreak(habitId);
+        }
+
+        function calculateHabitStreak(habitId) {
+            const habit = habits[habitId];
+            if (!habit) return;
+
+            let streak = 0;
+            const today = new Date();
+
+            for (let i = 0; i < 365; i++) {
+                const checkDate = new Date(today);
+                checkDate.setDate(today.getDate() - i);
+                const dateStr = checkDate.toISOString().split('T')[0];
+
+                const completion = habit.completions[dateStr] || 0;
+                if (completion >= habit.target) {
+                    streak++;
+                } else {
+                    break;
+                }
             }
+
+            database.ref(`habits/${habitId}/streak`).set(streak);
         }
 
-        function removeCategory(type, categoryName) {
-            if (confirm(`ต้องการลบหมวดหมู่ "${categoryName}" หรือไม่?`)) {
-                categories[type] = categories[type].filter(cat => cat !== categoryName);
-                database.ref(`categories/${type}`).set(categories[type]);
-            }
-        }
-
-        function displayCategories() {
-            displayCategoryList('income', 'incomeCategoriesList');
-            displayCategoryList('expense', 'expenseCategoriesList');
-        }
-
-        function displayCategoryList(type, containerId) {
-            const container = document.getElementById(containerId);
+        function renderHabits() {
+            const container = document.getElementById('habitsList');
             container.innerHTML = '';
 
-            categories[type].forEach(category => {
-                const div = document.createElement('div');
-                div.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
-                div.innerHTML = `
-                    <span class="text-gray-700">${category}</span>
-                    <button onclick="removeCategory('${type}', '${category}')" class="text-red-600 hover:text-red-800 text-sm">
-                        🗑️ ลบ
+            Object.entries(habits).forEach(([id, habit]) => {
+                const habitEl = createHabitElement(id, habit);
+                container.appendChild(habitEl);
+            });
+        }
+
+        function createHabitElement(id, habit) {
+            const div = document.createElement('div');
+            div.className = 'bg-white p-4 rounded-lg shadow';
+
+            const today = new Date().toISOString().split('T')[0];
+            const todayProgress = habit.completions[today] || 0;
+            const progressPercent = Math.min((todayProgress / habit.target) * 100, 100);
+
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-medium text-gray-800">${habit.name}</h4>
+                    <div class="flex items-center space-x-2">
+                        <span class="habit-streak text-white px-2 py-1 rounded text-sm">
+                            🔥 ${habit.streak || 0}
+                        </span>
+                        <button onclick="deleteHabit('${id}')" class="text-red-600 hover:text-red-800 text-sm">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>ความคืบหน้าวันนี้</span>
+                        <span>${todayProgress}/${habit.target} ${habit.unit}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-green-500 h-2 rounded-full transition-all duration-300" style="width: ${progressPercent}%"></div>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="updateHabitProgress('${id}', '${today}', ${todayProgress + 1})" 
+                            class="flex-1 bg-green-600 text-white py-2 px-3 rounded text-sm hover:bg-green-700 transition duration-200">
+                        ➕ เพิ่ม
                     </button>
-                `;
-                container.appendChild(div);
-            });
+                    <button onclick="updateHabitProgress('${id}', '${today}', Math.max(0, ${todayProgress - 1}))" 
+                            class="flex-1 bg-red-600 text-white py-2 px-3 rounded text-sm hover:bg-red-700 transition duration-200">
+                        ➖ ลด
+                    </button>
+                </div>
+            `;
+
+            return div;
         }
 
-        function updateCategorySelect() {
-            const typeSelect = document.getElementById('transactionType');
-            const categorySelect = document.getElementById('categorySelect');
-            const selectedType = typeSelect.value;
-
-            categorySelect.innerHTML = '';
-            categories[selectedType].forEach(category => {
-                const option = document.createElement('option');
-                option.value = category;
-                option.textContent = category;
-                categorySelect.appendChild(option);
-            });
-        }
-
-        function updateEditCategorySelect() {
-            const typeSelect = document.getElementById('editType');
-            const categorySelect = document.getElementById('editCategory');
-            const selectedType = typeSelect.value;
-
-            categorySelect.innerHTML = '';
-            categories[selectedType].forEach(category => {
-                const option = document.createElement('option');
-                option.value = category;
-                option.textContent = category;
-                categorySelect.appendChild(option);
-            });
-        }
-
-        // Transactions Management
-        function loadTransactions() {
-            const monthKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
-
-            database.ref(`transactions/${monthKey}`).on('value', (snapshot) => {
-                transactions = snapshot.val() || {};
-                updateDashboard();
-                displayTransactionsList();
-            });
-        }
-
-        function addTransaction(e) {
-            e.preventDefault();
-
-            const type = document.getElementById('transactionType').value;
-            const category = document.getElementById('categorySelect').value;
-            const amount = parseFloat(document.getElementById('amount').value);
-            const date = document.getElementById('transactionDate').value;
-            const description = document.getElementById('description').value;
-
-            const monthKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
-            const transactionId = Date.now().toString();
-
-            const transaction = {
-                type,
-                category,
-                amount,
-                date,
-                description,
-                timestamp: Date.now()
-            };
-
-            database.ref(`transactions/${monthKey}/${transactionId}`).set(transaction);
-
-            // Reset form
-            document.getElementById('transactionForm').reset();
-            document.getElementById('transactionDate').value = new Date().toISOString().split('T')[0];
-
-            // Switch to dashboard
-            switchTab('dashboard');
-        }
-
-        function editTransaction(id) {
-            const transaction = transactions[id];
-            if (!transaction) return;
-
-            document.getElementById('editId').value = id;
-            document.getElementById('editType').value = transaction.type;
-            document.getElementById('editAmount').value = transaction.amount;
-            document.getElementById('editDate').value = transaction.date;
-            document.getElementById('editDescription').value = transaction.description;
-
-            updateEditCategorySelect();
-            document.getElementById('editCategory').value = transaction.category;
-
-            document.getElementById('editModal').classList.remove('hidden');
-            document.getElementById('editModal').classList.add('flex');
-        }
-
-        function updateTransaction(e) {
-            e.preventDefault();
-
-            const id = document.getElementById('editId').value;
-            const type = document.getElementById('editType').value;
-            const category = document.getElementById('editCategory').value;
-            const amount = parseFloat(document.getElementById('editAmount').value);
-            const date = document.getElementById('editDate').value;
-            const description = document.getElementById('editDescription').value;
-
-            const monthKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
-
-            const transaction = {
-                type,
-                category,
-                amount,
-                date,
-                description,
-                timestamp: transactions[id].timestamp
-            };
-
-            database.ref(`transactions/${monthKey}/${id}`).set(transaction);
-            closeEditModal();
-        }
-
-        function deleteTransaction(id) {
-            if (confirm('ต้องการลบรายการนี้หรือไม่?')) {
-                const monthKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
-                database.ref(`transactions/${monthKey}/${id}`).remove();
+        function deleteHabit(habitId) {
+            if (confirm('ต้องการลบนิสัยนี้หรือไม่?')) {
+                database.ref(`habits/${habitId}`).remove();
             }
         }
 
-        function closeEditModal() {
-            document.getElementById('editModal').classList.add('hidden');
-            document.getElementById('editModal').classList.remove('flex');
+        // Reward Management
+        function openRewardModal() {
+            document.getElementById('rewardModal').classList.remove('hidden');
+            document.getElementById('rewardModal').classList.add('flex');
         }
 
-        // Dashboard Functions
-        function updateDashboard() {
-            calculateSummary();
-            updatePieChart();
-            displayRecentTransactions();
+        function closeRewardModal() {
+            document.getElementById('rewardModal').classList.add('hidden');
+            document.getElementById('rewardModal').classList.remove('flex');
         }
 
-        function calculateSummary() {
-            let totalIncome = 0;
-            let totalExpense = 0;
+        function saveReward(e) {
+            e.preventDefault();
 
-            Object.values(transactions).forEach(transaction => {
-                if (transaction.type === 'income') {
-                    totalIncome += transaction.amount;
-                } else {
-                    totalExpense += transaction.amount;
+            const rewardId = Date.now().toString();
+            const rewardData = {
+                name: document.getElementById('rewardName').value,
+                duration: parseInt(document.getElementById('rewardDuration').value),
+                description: document.getElementById('rewardDescription').value,
+                createdAt: Date.now()
+            };
+
+            database.ref(`rewards/${rewardId}`).set(rewardData);
+            closeRewardModal();
+            document.getElementById('rewardForm').reset();
+        }
+
+        function deleteReward(rewardId) {
+            if (confirm('ต้องการลบรางวัลนี้หรือไม่?')) {
+                database.ref(`rewards/${rewardId}`).remove();
+            }
+        }
+
+        function scheduleReward(rewardId) {
+            const reward = rewards[rewardId];
+            if (!reward) return;
+
+            alert(`🎉 ยินดีด้วย! คุณได้รับรางวัล: ${reward.name} (${reward.duration} นาที)`);
+
+            // Add reward to calendar (simplified implementation)
+            const now = new Date();
+            const endTime = new Date(now.getTime() + reward.duration * 60000);
+
+            console.log(`Reward scheduled: ${reward.name} from ${now.toLocaleTimeString()} to ${endTime.toLocaleTimeString()}`);
+        }
+
+        function renderRewards() {
+            const container = document.getElementById('rewardsList');
+            container.innerHTML = '';
+
+            Object.entries(rewards).forEach(([id, reward]) => {
+                const rewardEl = createRewardElement(id, reward);
+                container.appendChild(rewardEl);
+            });
+        }
+
+        function createRewardElement(id, reward) {
+            const div = document.createElement('div');
+            div.className = 'bg-white p-4 rounded-lg shadow';
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-medium text-gray-800">${reward.name}</h4>
+                    <button onclick="deleteReward('${id}')" class="text-red-600 hover:text-red-800 text-sm">
+                        🗑️
+                    </button>
+                </div>
+                <p class="text-gray-600 text-sm mb-2">${reward.description || 'ไม่มีรายละเอียด'}</p>
+                <div class="flex justify-between items-center text-sm text-gray-500">
+                    <span>⏱️ ${reward.duration} นาที</span>
+                    <button onclick="scheduleReward('${id}')" class="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700 transition duration-200">
+                        🎁 ใช้รางวัล
+                    </button>
+                </div>
+            `;
+
+            return div;
+        }
+
+        function updateRewardSelect() {
+            const select = document.getElementById('taskReward');
+            select.innerHTML = '<option value="">ไม่มีรางวัล</option>';
+
+            Object.entries(rewards).forEach(([id, reward]) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = `${reward.name} (${reward.duration} นาที)`;
+                select.appendChild(option);
+            });
+        }
+
+        // Daily Plan Management
+        function openDailyPlanModal() {
+            const modal = document.getElementById('dailyPlanModal');
+            const taskSelection = document.getElementById('taskSelection');
+            const dailyTasksList = document.getElementById('dailyTasksList');
+
+            // Clear previous selections
+            taskSelection.innerHTML = '';
+            dailyTasksList.innerHTML = '';
+
+            // Show available tasks
+            Object.entries(tasks).forEach(([id, task]) => {
+                if (!task.completed && !dailyPlan.includes(id)) {
+                    const taskEl = document.createElement('div');
+                    taskEl.className = 'flex items-center p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100';
+                    taskEl.innerHTML = `
+                        <input type="checkbox" class="mr-2" data-task-id="${id}">
+                        <span class="flex-1">${task.title}</span>
+                        <span class="text-xs text-gray-500">${task.priority}</span>
+                    `;
+                    taskSelection.appendChild(taskEl);
                 }
             });
 
-            const balance = totalIncome - totalExpense;
+            // Show current daily plan
+            dailyPlan.forEach((taskId, index) => {
+                if (tasks[taskId]) {
+                    const taskEl = createDailyPlanTaskElement(taskId, tasks[taskId], index);
+                    dailyTasksList.appendChild(taskEl);
+                }
+            });
 
-            document.getElementById('totalIncome').textContent = `฿${totalIncome.toLocaleString()}`;
-            document.getElementById('totalExpense').textContent = `฿${totalExpense.toLocaleString()}`;
-            document.getElementById('balance').textContent = `฿${balance.toLocaleString()}`;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
 
-            // Update balance color
-            const balanceElement = document.getElementById('balance');
-            if (balance >= 0) {
-                balanceElement.className = 'text-blue-700 font-bold text-lg';
-            } else {
-                balanceElement.className = 'text-red-700 font-bold text-lg';
+        function closeDailyPlanModal() {
+            document.getElementById('dailyPlanModal').classList.add('hidden');
+            document.getElementById('dailyPlanModal').classList.remove('flex');
+        }
+
+        function saveDailyPlan() {
+            const selectedTasks = [];
+            const checkboxes = document.querySelectorAll('#taskSelection input[type="checkbox"]:checked');
+
+            checkboxes.forEach(checkbox => {
+                selectedTasks.push(checkbox.dataset.taskId);
+            });
+
+            // Limit to 6 tasks
+            const finalPlan = selectedTasks.slice(0, 6);
+
+            database.ref('dailyPlan').set(finalPlan);
+            closeDailyPlanModal();
+        }
+
+        function createDailyPlanTaskElement(id, task, index) {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between p-3 bg-white rounded border';
+            div.innerHTML = `
+                <div class="flex items-center">
+                    <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm mr-3">
+                        ${index + 1}
+                    </span>
+                    <span>${task.title}</span>
+                </div>
+                <button onclick="removeFromDailyPlan('${id}')" class="text-red-600 hover:text-red-800 text-sm">
+                    ❌
+                </button>
+            `;
+            return div;
+        }
+
+        function removeFromDailyPlan(taskId) {
+            const newPlan = dailyPlan.filter(id => id !== taskId);
+            database.ref('dailyPlan').set(newPlan);
+        }
+
+        function renderDailyPlan() {
+            const container = document.getElementById('dailyTasks');
+            container.innerHTML = '';
+
+            if (dailyPlan.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">ยังไม่มีแผนงานสำหรับวันนี้</p>';
+                return;
+            }
+
+            dailyPlan.forEach((taskId, index) => {
+                if (tasks[taskId]) {
+                    const taskEl = createDailyTaskElement(taskId, tasks[taskId], index);
+                    container.appendChild(taskEl);
+                }
+            });
+        }
+
+        function createDailyTaskElement(id, task, index) {
+            const div = document.createElement('div');
+            div.className = `flex items-center justify-between p-4 bg-white rounded-lg shadow ${task.completed ? 'opacity-50' : ''}`;
+
+            div.innerHTML = `
+                <div class="flex items-center">
+                    <span class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mr-4">
+                        ${index + 1}
+                    </span>
+                    <div>
+                        <h4 class="font-medium text-gray-800 ${task.completed ? 'line-through' : ''}">${task.title}</h4>
+                        <p class="text-sm text-gray-600">${task.description || 'ไม่มีรายละเอียด'}</p>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    ${!task.completed ? `
+                        <button onclick="toggleTask('${id}')" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition duration-200">
+                            ✅ เสร็จ
+                        </button>
+                    ` : ''}
+                    <button onclick="removeFromDailyPlan('${id}')" class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition duration-200">
+                        ❌ ลบ
+                    </button>
+                </div>
+            `;
+
+            return div;
+        }
+
+        // Calendar & Time Blocking
+        function generateTimeBlocks() {
+            const container = document.getElementById('timeBlocks');
+            const selectedDate = document.getElementById('calendarDate').value;
+
+            container.innerHTML = '';
+
+            // Generate 24-hour time blocks
+            for (let hour = 0; hour < 24; hour++) {
+                const timeBlock = document.createElement('div');
+                timeBlock.className = 'time-block flex items-center p-3 rounded-lg';
+
+                const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+
+                timeBlock.innerHTML = `
+                    <div class="w-16 text-sm font-mono text-gray-600">${timeStr}</div>
+                    <div class="flex-1 ml-4 text-gray-500">ว่าง</div>
+                `;
+
+                container.appendChild(timeBlock);
             }
         }
 
-        function updatePieChart() {
-            const ctx = document.getElementById('pieChart').getContext('2d');
+        // Pomodoro Timer
+        function togglePomodoro() {
+            if (isPomodoroRunning) {
+                pausePomodoro();
+            } else {
+                startPomodoro();
+            }
+        }
 
-            // Calculate category totals
-            const categoryTotals = {};
-            Object.values(transactions).forEach(transaction => {
-                const key = `${transaction.type === 'income' ? '📈' : '📉'} ${transaction.category}`;
-                categoryTotals[key] = (categoryTotals[key] || 0) + transaction.amount;
+        function startPomodoro() {
+            isPomodoroRunning = true;
+            document.getElementById('timerBtn').innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6l4-2-4-2z"></path>
+                </svg>
+            `;
+            document.getElementById('pomodoroTimer').classList.add('pomodoro-active');
+
+            pomodoroInterval = setInterval(() => {
+                pomodoroTimeLeft--;
+                updatePomodoroDisplay();
+
+                if (pomodoroTimeLeft <= 0) {
+                    pomodoroComplete();
+                }
+            }, 1000);
+        }
+
+        function pausePomodoro() {
+            isPomodoroRunning = false;
+            clearInterval(pomodoroInterval);
+            document.getElementById('timerBtn').innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m6-6V7a3 3 0 00-3-3H6a3 3 0 00-3 3v1"></path>
+                </svg>
+            `;
+            document.getElementById('pomodoroTimer').classList.remove('pomodoro-active');
+        }
+
+        function pomodoroComplete() {
+            pausePomodoro();
+            pomodoroTimeLeft = settings.pomodoroTime * 60;
+            updatePomodoroDisplay();
+
+            alert('🍅 Pomodoro เสร็จสิ้น! เวลาพักผ่อน');
+        }
+
+        function updatePomodoroDisplay() {
+            const minutes = Math.floor(pomodoroTimeLeft / 60);
+            const seconds = pomodoroTimeLeft % 60;
+            document.getElementById('timerDisplay').textContent =
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Statistics
+        function renderStats() {
+            updateTaskStats();
+            renderPerformanceChart();
+        }
+
+        function updateTaskStats() {
+            const today = new Date().toISOString().split('T')[0];
+            const weekStart = new Date();
+            weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+
+            let todayCompleted = 0;
+            let weekCompleted = 0;
+            let todayFocusTime = 0;
+
+            Object.values(tasks).forEach(task => {
+                if (task.completed && task.completedAt) {
+                    const completedDate = new Date(task.completedAt).toISOString().split('T')[0];
+                    const completedDateTime = new Date(task.completedAt);
+
+                    if (completedDate === today) {
+                        todayCompleted++;
+                    }
+
+                    if (completedDateTime >= weekStart) {
+                        weekCompleted++;
+                    }
+                }
+
+                if (task.timeSpent) {
+                    // Simplified: assume all time was spent today
+                    todayFocusTime += task.timeSpent;
+                }
             });
 
-            const labels = Object.keys(categoryTotals);
-            const data = Object.values(categoryTotals);
-            const colors = generateColors(labels.length);
+            document.getElementById('todayCompleted').textContent = todayCompleted;
+            document.getElementById('weekCompleted').textContent = weekCompleted;
+            document.getElementById('todayFocusTime').textContent = `${todayFocusTime} นาที`;
+        }
 
-            if (pieChart) {
-                pieChart.destroy();
+        function renderPerformanceChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+
+            // Generate sample data for the last 7 days
+            const labels = [];
+            const data = [];
+
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                labels.push(date.toLocaleDateString('th-TH', { weekday: 'short' }));
+
+                // Count completed tasks for this date
+                const dateStr = date.toISOString().split('T')[0];
+                let completed = 0;
+
+                Object.values(tasks).forEach(task => {
+                    if (task.completed && task.completedAt) {
+                        const completedDate = new Date(task.completedAt).toISOString().split('T')[0];
+                        if (completedDate === dateStr) {
+                            completed++;
+                        }
+                    }
+                });
+
+                data.push(completed);
             }
 
-            pieChart = new Chart(ctx, {
-                type: 'pie',
+            new Chart(ctx, {
+                type: 'line',
                 data: {
                     labels: labels,
                     datasets: [{
+                        label: 'งานที่เสร็จสิ้น',
                         data: data,
-                        backgroundColor: colors,
-                        borderWidth: 2,
-                        borderColor: '#fff'
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
                     }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 10,
-                                usePointStyle: true
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function generateColors(count) {
-            const colors = [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
-                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF',
-                '#4BC0C0', '#FF6384', '#36A2EB', '#FFCE56'
-            ];
-            return colors.slice(0, count);
-        }
-
-        function displayRecentTransactions() {
-            const container = document.getElementById('recentTransactions');
-            container.innerHTML = '';
-
-            const sortedTransactions = Object.entries(transactions)
-                .sort(([, a], [, b]) => b.timestamp - a.timestamp)
-                .slice(0, 5);
-
-            if (sortedTransactions.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-4">ยังไม่มีรายการในเดือนนี้</p>';
-                return;
-            }
-
-            sortedTransactions.forEach(([id, transaction]) => {
-                const div = document.createElement('div');
-                div.className = `flex justify-between items-center p-3 rounded-lg ${transaction.type === 'income' ? 'bg-green-50' : 'bg-red-50'
-                    }`;
-
-                const amountClass = transaction.type === 'income' ? 'text-green-700' : 'text-red-700';
-                const sign = transaction.type === 'income' ? '+' : '-';
-
-                div.innerHTML = `
-                    <div>
-                        <div class="font-medium text-gray-800">${transaction.category}</div>
-                        <div class="text-sm text-gray-600">${transaction.description || 'ไม่มีรายละเอียด'}</div>
-                        <div class="text-xs text-gray-500">${new Date(transaction.date).toLocaleDateString('th-TH')}</div>
-                    </div>
-                    <div class="${amountClass} font-bold">
-                        ${sign}฿${transaction.amount.toLocaleString()}
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        function displayTransactionsList() {
-            const container = document.getElementById('transactionsList');
-            container.innerHTML = '';
-
-            const sortedTransactions = Object.entries(transactions)
-                .sort(([, a], [, b]) => new Date(b.date) - new Date(a.date));
-
-            if (sortedTransactions.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-8">ยังไม่มีรายการในเดือนนี้</p>';
-                return;
-            }
-
-            sortedTransactions.forEach(([id, transaction]) => {
-                const div = document.createElement('div');
-                div.className = `flex justify-between items-center p-4 rounded-lg border ${transaction.type === 'income' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
-                    }`;
-
-                const amountClass = transaction.type === 'income' ? 'text-green-700' : 'text-red-700';
-                const sign = transaction.type === 'income' ? '+' : '-';
-
-                div.innerHTML = `
-                    <div class="flex-1">
-                        <div class="font-medium text-gray-800">${transaction.category}</div>
-                        <div class="text-sm text-gray-600">${transaction.description || 'ไม่มีรายละเอียด'}</div>
-                        <div class="text-xs text-gray-500">${new Date(transaction.date).toLocaleDateString('th-TH')}</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="${amountClass} font-bold text-lg">
-                            ${sign}฿${transaction.amount.toLocaleString()}
-                        </div>
-                        <div class="flex gap-2 mt-2">
-                            <button onclick="editTransaction('${id}')" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition duration-200">
-                                ✏️ แก้ไข
-                            </button>
-                            <button onclick="deleteTransaction('${id}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition duration-200">
-                                🗑️ ลบ
-                            </button>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        // Yearly Summary
-        function loadYearlySummary(year) {
-            const yearlyData = {};
-
-            // Load all months for the year
-            for (let month = 1; month <= 12; month++) {
-                const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
-
-                database.ref(`transactions/${monthKey}`).once('value', (snapshot) => {
-                    const monthTransactions = snapshot.val() || {};
-
-                    let monthIncome = 0;
-                    let monthExpense = 0;
-
-                    Object.values(monthTransactions).forEach(transaction => {
-                        if (transaction.type === 'income') {
-                            monthIncome += transaction.amount;
-                        } else {
-                            monthExpense += transaction.amount;
-                        }
-                    });
-
-                    yearlyData[month] = {
-                        income: monthIncome,
-                        expense: monthExpense,
-                        balance: monthIncome - monthExpense
-                    };
-
-                    // Update chart when all months are loaded
-                    if (Object.keys(yearlyData).length === 12) {
-                        updateYearlyChart(yearlyData);
-                        updateYearlySummary(yearlyData);
-                    }
-                });
-            }
-        }
-
-        function updateYearlyChart(yearlyData) {
-            const ctx = document.getElementById('yearlyBarChart').getContext('2d');
-
-            const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-            const incomeData = [];
-            const expenseData = [];
-
-            for (let i = 1; i <= 12; i++) {
-                incomeData.push(yearlyData[i]?.income || 0);
-                expenseData.push(yearlyData[i]?.expense || 0);
-            }
-
-            if (yearlyChart) {
-                yearlyChart.destroy();
-            }
-
-            yearlyChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: months,
-                    datasets: [
-                        {
-                            label: 'รายรับ',
-                            data: incomeData,
-                            backgroundColor: '#10B981',
-                            borderColor: '#059669',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'รายจ่าย',
-                            data: expenseData,
-                            backgroundColor: '#EF4444',
-                            borderColor: '#DC2626',
-                            borderWidth: 1
-                        }
-                    ]
                 },
                 options: {
                     responsive: true,
@@ -843,21 +1358,7 @@
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                callback: function (value) {
-                                    return '฿' + value.toLocaleString();
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    return context.dataset.label + ': ฿' + context.parsed.y.toLocaleString();
-                                }
+                                stepSize: 1
                             }
                         }
                     }
@@ -865,44 +1366,108 @@
             });
         }
 
-        function updateYearlySummary(yearlyData) {
-            let totalIncome = 0;
-            let totalExpense = 0;
-
-            Object.values(yearlyData).forEach(monthData => {
-                totalIncome += monthData.income;
-                totalExpense += monthData.expense;
-            });
-
-            const totalBalance = totalIncome - totalExpense;
-
-            const summaryContainer = document.getElementById('yearlySummary');
-            summaryContainer.innerHTML = `
-                <div class="bg-green-50 p-4 rounded-lg text-center">
-                    <div class="text-2xl font-bold text-green-700">฿${totalIncome.toLocaleString()}</div>
-                    <div class="text-green-600">รายรับรวมทั้งปี</div>
-                </div>
-                <div class="bg-red-50 p-4 rounded-lg text-center">
-                    <div class="text-2xl font-bold text-red-700">฿${totalExpense.toLocaleString()}</div>
-                    <div class="text-red-600">รายจ่ายรวมทั้งปี</div>
-                </div>
-                <div class="bg-blue-50 p-4 rounded-lg text-center">
-                    <div class="text-2xl font-bold ${totalBalance >= 0 ? 'text-blue-700' : 'text-red-700'}">
-                        ฿${totalBalance.toLocaleString()}
-                    </div>
-                    <div class="${totalBalance >= 0 ? 'text-blue-600' : 'text-red-600'}">คงเหลือสุทธิ</div>
-                </div>
-            `;
+        function updateStats() {
+            if (currentView === 'stats') {
+                renderStats();
+            }
         }
 
-        // Click outside modal to close
-        document.getElementById('editModal').addEventListener('click', function (e) {
-            if (e.target === this) {
-                closeEditModal();
+        // Trash Management
+        function renderTrash() {
+            const container = document.getElementById('trashList');
+            container.innerHTML = '';
+
+            if (Object.keys(trashedTasks).length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">ถังขยะว่างเปล่า</p>';
+                return;
             }
+
+            Object.entries(trashedTasks).forEach(([id, task]) => {
+                const taskEl = createTrashTaskElement(id, task);
+                container.appendChild(taskEl);
+            });
+        }
+
+        function createTrashTaskElement(id, task) {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg';
+
+            div.innerHTML = `
+                <div>
+                    <h4 class="font-medium text-gray-800">${task.title}</h4>
+                    <p class="text-sm text-gray-600">ลบเมื่อ: ${new Date(task.deletedAt).toLocaleString('th-TH')}</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="restoreTask('${id}')" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition duration-200">
+                        ↩️ กู้คืน
+                    </button>
+                    <button onclick="permanentDelete('${id}')" class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition duration-200">
+                        🗑️ ลบถาวร
+                    </button>
+                </div>
+            `;
+
+            return div;
+        }
+
+        function restoreTask(taskId) {
+            const task = trashedTasks[taskId];
+            if (task) {
+                const { deletedAt, ...taskData } = task;
+                database.ref(`tasks/${taskId}`).set(taskData);
+                database.ref(`trash/${taskId}`).remove();
+            }
+        }
+
+        function permanentDelete(taskId) {
+            if (confirm('ต้องการลบงานนี้ถาวรหรือไม่? การกระทำนี้ไม่สามารถยกเลิกได้')) {
+                database.ref(`trash/${taskId}`).remove();
+            }
+        }
+
+        function emptyTrash() {
+            if (confirm('ต้องการล้างถังขยะทั้งหมดหรือไม่? การกระทำนี้ไม่สามารถยกเลิกได้')) {
+                database.ref('trash').remove();
+            }
+        }
+
+        // Settings Management
+        function saveSettings() {
+            settings.pomodoroTime = parseInt(document.getElementById('pomodoroTime').value);
+            settings.shortBreakTime = parseInt(document.getElementById('shortBreakTime').value);
+            settings.longBreakTime = parseInt(document.getElementById('longBreakTime').value);
+
+            database.ref('settings').set(settings);
+
+            // Update pomodoro timer
+            if (!isPomodoroRunning) {
+                pomodoroTimeLeft = settings.pomodoroTime * 60;
+                updatePomodoroDisplay();
+            }
+
+            alert('✅ บันทึกการตั้งค่าเรียบร้อย');
+        }
+
+        function updateSettingsUI() {
+            document.getElementById('pomodoroTime').value = settings.pomodoroTime;
+            document.getElementById('shortBreakTime').value = settings.shortBreakTime;
+            document.getElementById('longBreakTime').value = settings.longBreakTime;
+
+            pomodoroTimeLeft = settings.pomodoroTime * 60;
+            updatePomodoroDisplay();
+        }
+
+        // Modal click outside to close
+        document.querySelectorAll('.fixed.inset-0').forEach(modal => {
+            modal.addEventListener('click', function (e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                    this.classList.remove('flex');
+                }
+            });
         });
     </script>
-    <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'9859722f650945b9',t:'MTc1ODk1OTgwMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
+    <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'985b9f36b21c10f8',t:'MTc1ODk4MjYxOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
 </body>
 
 </html>
