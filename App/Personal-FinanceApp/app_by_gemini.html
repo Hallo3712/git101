@@ -4,21 +4,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Productivity Hub: แอปจัดการงานและเวลา</title>
+    <title>Productivity Hub: แอปจัดการงานและเวลาส่วนตัว</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.1.1/24/outline/academic-cap.svg" rel="stylesheet">
     <style>
-        /* Chosen Palette: Calm Neutrals with a Touch of Mint */
-        /* Application Structure Plan: The app uses a sidebar navigation model, a common and intuitive pattern for SPAs. The main content area dynamically switches between different "views" (Eisenhower, Daily Plan, etc.) controlled by JavaScript. This keeps the UI clean and focused. The Eisenhower Matrix is the default view, offering an immediate, high-level overview of all tasks and their priorities, which is crucial for initial planning. */
-        /* Visualization & Content Choices: 
-           - Eisenhower Matrix: Implemented as a 2x2 responsive grid using Tailwind CSS for a clear, visual separation of priorities.
-           - Daily Plan (Ivy Lee): A simple, focused list to prevent overwhelm.
-           - Time Blocking Calendar: A custom-built grid using HTML divs, allowing for flexible and direct visualization without external libraries.
-           - Statistics: Chart.js is used for bar and doughnut charts to provide clear, actionable insights into user productivity.
-           - All interactions are handled with vanilla JavaScript, ensuring performance and minimal dependencies.
-        */
-        /* CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. */
+        /* This section contains explicit Tailwind classes used dynamically 
+           to ensure they are not purged by the CDN compiler. */
+
+        /* Eisenhower Matrix Colors */
+        .text-red-600 {
+            color: #dc2626;
+        }
+
+        .border-red-400 {
+            border-color: #f87171;
+        }
+
+        .text-blue-600 {
+            color: #2563eb;
+        }
+
+        .border-blue-400 {
+            border-color: #60a5fa;
+        }
+
+        .text-yellow-600 {
+            color: #d97706;
+        }
+
+        .border-yellow-400 {
+            border-color: #facc15;
+        }
+
+        .text-gray-600 {
+            color: #4b5563;
+        }
+
+        .border-gray-400 {
+            border-color: #9ca3af;
+        }
+
+        /* Chart Colors (for dynamic rendering) */
+        .bg-green-600 {
+            background-color: #059669;
+        }
+
         body {
             font-family: 'Inter', 'Kanit', sans-serif;
         }
@@ -80,6 +111,7 @@
             class="sidebar sidebar-closed md:w-64 bg-white border-r border-gray-200 absolute inset-y-0 left-0 z-30 md:relative md:translate-x-0">
             <div class="p-4 border-b">
                 <h2 class="text-xl font-bold text-gray-700">Productivity Hub</h2>
+                <p id="user-id-display" class="text-xs text-gray-400 truncate mt-1">กำลังโหลด...</p>
             </div>
             <nav class="mt-4">
                 <a href="#" class="nav-link flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100"
@@ -159,16 +191,52 @@
 
         <!-- Main Content -->
         <div class="flex-1 flex flex-col">
-            <header class="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
-                <button id="sidebar-toggle" class="md:hidden text-gray-500">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </button>
-                <h1 id="view-title" class="text-xl font-semibold">รายการงานทั้งหมด</h1>
-                <div id="pomodoro-timer" class="text-lg font-mono">25:00</div>
+            <header
+                class="bg-white border-b border-gray-200 p-3 flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">
+                <div class="flex items-center">
+                    <button id="sidebar-toggle" class="md:hidden text-gray-500 mr-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                    <h1 id="view-title" class="text-xl font-semibold">รายการงานทั้งหมด</h1>
+                </div>
+                <!-- Pomodoro Timer Controls -->
+                <div id="pomodoro-controls"
+                    class="flex items-center space-x-3 bg-gray-100 p-2 rounded-full shadow-inner">
+                    <div id="pomodoro-timer" class="text-lg font-mono font-bold text-blue-700 w-16 text-center">25:00
+                    </div>
+                    <span id="timer-status" class="text-sm text-gray-600">โฟกัส</span>
+                    <button id="timer-start-pause"
+                        class="text-blue-600 hover:text-blue-800 p-1 rounded-full bg-white shadow">
+                        <svg id="play-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14.752 11.168l-3.197 2.132A1 1 0 0110.25 13V9a1 1 0 011.305-.992l3.197 2.132a1 1 0 010 1.656z">
+                            </path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <svg id="pause-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </button>
+                    <button id="timer-reset" class="text-gray-500 hover:text-gray-700 p-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356-2A8.991 8.991 0 0120.945 13H15m-1.556-4.757l1.066 1.067"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20 20v-5h-.581m-15.357 2A8.991 8.991 0 013.055 11H9m1.556 4.757l-1.066-1.067">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+                <!-- End Pomodoro Controls -->
             </header>
 
             <main class="flex-1 p-6 overflow-y-auto bg-gray-100">
@@ -186,11 +254,13 @@
 
     <!-- Floating Add Button -->
     <button id="add-task-btn"
-        class="fixed bottom-8 right-8 bg-blue-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-blue-700 transition">
+        class="fixed bottom-8 right-8 bg-blue-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-blue-700 transition z-20">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
         </svg>
     </button>
+
+    <!-- Modals -->
 
     <!-- Add/Edit Task Modal -->
     <div id="task-modal" class="modal-backdrop fixed inset-0 z-40 flex items-center justify-center hidden">
@@ -231,7 +301,6 @@
                     <select id="task-reward"
                         class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         <option value="">ไม่มีรางวัล</option>
-                        <!-- Reward options will be populated by JS -->
                     </select>
                 </div>
 
@@ -245,13 +314,28 @@
         </div>
     </div>
 
+    <!-- Action/Reward Modal -->
+    <div id="action-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-sm mx-4 text-center">
+            <h3 id="action-title" class="text-2xl font-bold mb-3 text-green-600">สำเร็จ!</h3>
+            <p id="action-message" class="text-gray-700 mb-6"></p>
+            <div class="flex justify-center space-x-4">
+                <button type="button" id="start-break-btn"
+                    class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 font-semibold">เริ่มพัก!</button>
+                <button type="button" id="close-action-btn"
+                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">ปิด</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
-        // Firebase SDK imports
+        // Firebase SDK imports for Realtime Database (RTDB)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getDatabase, ref, onValue, set, push, remove, update } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
+        // IMPORTANT: REPLACE THESE WITH YOUR OWN FIREBASE CONFIGURATION
         const firebaseConfig = {
-            // Your web app's Firebase configuration
             apiKey: "AIzaSyCJQ9hVsMFm5LYKPvyAA342XcBh4iAI9Ek",
             authDomain: "create-app-e4028.firebaseapp.com",
             databaseURL: "https://create-app-e4028-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -261,24 +345,38 @@
             appId: "1:612684670881:web:3650b675274176a8db8de0"
         };
 
+        const DEFAULT_WORK_MINUTES = 25;
+        const DEFAULT_BREAK_MINUTES = 5;
+
+        // Check for placeholder config and warn the user
         if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-            document.body.innerHTML = `<div class="p-8 text-center bg-yellow-100 text-yellow-800">
-                <h1 class="text-2xl font-bold">กรุณาตั้งค่า Firebase</h1>
-                <p class="mt-2">คุณต้องใส่ข้อมูล Firebase Configuration ของคุณในโค้ด JavaScript (ตัวแปร firebaseConfig) เพื่อให้แอปทำงานได้</p>
+            document.body.innerHTML = `<div class="p-8 text-center bg-red-100 text-red-800 h-screen flex flex-col items-center justify-center">
+                <h1 class="text-3xl font-bold mb-4">ข้อผิดพลาดในการตั้งค่า Firebase</h1>
+                <p class="mt-2 text-lg">กรุณาแทนที่ค่าในตัวแปร <code class="bg-red-200 p-1 rounded font-mono">firebaseConfig</code> ด้วยข้อมูล Firebase Realtime Database ของคุณเพื่อใช้งาน</p>
             </div>`;
+            throw new Error("Firebase configuration is missing or using placeholders.");
         }
 
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        let userId = null;
+        let dataRef = null;
 
         // --- State Management ---
         let tasks = {};
         let rewards = {};
-        let habits = {};
         let trash = {};
         let currentView = 'eisenhower-view';
+
+        // --- Pomodoro State ---
+        let timerInterval = null;
+        let isTimerRunning = false;
+        let isBreak = false;
+        let timeRemaining = DEFAULT_WORK_MINUTES * 60; // seconds
 
         // --- UI Elements ---
         const sidebar = document.getElementById('sidebar');
@@ -291,30 +389,184 @@
         const taskForm = document.getElementById('task-form');
         const cancelTaskBtn = document.getElementById('cancel-task-btn');
         const modalTitle = document.getElementById('modal-title');
+        const userIdDisplay = document.getElementById('user-id-display');
+
+        // Pomodoro UI Elements
+        const timerDisplay = document.getElementById('pomodoro-timer');
+        const timerStatus = document.getElementById('timer-status');
+        const startPauseBtn = document.getElementById('timer-start-pause');
+        const resetBtn = document.getElementById('timer-reset');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+
+        // Action/Reward Modal Elements
+        const actionModal = document.getElementById('action-modal');
+        const actionTitle = document.getElementById('action-title');
+        const actionMessage = document.getElementById('action-message');
+        const startBreakBtn = document.getElementById('start-break-btn');
+        const closeActionBtn = document.getElementById('close-action-btn');
+
+        // --- Authentication and Setup ---
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                // Using RTDB path convention
+                dataRef = ref(db, `users/${userId}`);
+                userIdDisplay.textContent = `User ID: ${userId}`;
+
+                // Start listening to the database AFTER authentication
+                setupDatabaseListeners();
+                switchView(currentView);
+            } else {
+                // Sign in anonymously if not authenticated
+                signInAnonymously(auth).catch(error => {
+                    console.error("Anonymous sign in failed:", error);
+                    userIdDisplay.textContent = "AUTH ERROR";
+                });
+            }
+        });
+
+        function setupDatabaseListeners() {
+            // Listen for tasks updates
+            onValue(ref(dataRef, 'tasks'), (snapshot) => {
+                tasks = snapshot.val() || {};
+                renderView(currentView);
+            });
+
+            // Listen for rewards updates
+            onValue(ref(dataRef, 'rewards'), (snapshot) => {
+                rewards = snapshot.val() || {};
+                if (currentView === 'settings-view') renderView(currentView);
+                // Rerender the modal if it's open to update rewards list (important fix)
+                const taskId = document.getElementById('task-id')?.value;
+                if (!taskModal.classList.contains('hidden') && taskId && tasks[taskId]) {
+                    openTaskModal(tasks[taskId]);
+                } else if (!taskModal.classList.contains('hidden')) {
+                    openTaskModal(null); // Just ensure rewards are updated for new task
+                }
+            });
+
+            // Listen for trash updates
+            onValue(ref(dataRef, 'trash'), (snapshot) => {
+                trash = snapshot.val() || {};
+                if (currentView === 'trash-view') renderView(currentView);
+            });
+        }
+
+        // --- Pomodoro Logic ---
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function handleTimerEnd() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isTimerRunning = false;
+
+            // Visual cue
+            timerStatus.textContent = isBreak ? "พักเสร็จแล้ว!" : "หมดเวลาโฟกัส!";
+            timerDisplay.classList.add('animate-pulse', isBreak ? 'text-blue-700' : 'text-red-600');
+
+            pauseIcon.classList.add('hidden');
+            playIcon.classList.remove('hidden');
+
+            // Automatically reset to work timer after break ends
+            if (isBreak) {
+                setTimeout(() => resetTimer(false), 2000);
+            }
+        }
+
+        function startTimer(durationSeconds, isForBreak = false) {
+            if (timerInterval) clearInterval(timerInterval);
+
+            isBreak = isForBreak;
+            timeRemaining = durationSeconds;
+            isTimerRunning = true;
+
+            timerDisplay.classList.remove('animate-pulse', 'text-red-600', 'text-green-600', 'text-blue-700');
+            timerDisplay.classList.add(isBreak ? 'text-green-600' : 'text-blue-700');
+            timerStatus.textContent = isBreak ? "กำลังพัก" : "กำลังโฟกัส";
+
+            pauseIcon.classList.remove('hidden');
+            playIcon.classList.add('hidden');
+
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                if (timeRemaining <= 0) {
+                    handleTimerEnd();
+                    return;
+                }
+                timeRemaining--;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            if (!isTimerRunning) return;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isTimerRunning = false;
+            timerStatus.textContent = isBreak ? "หยุดพักชั่วคราว" : "หยุดโฟกัสชั่วคราว";
+            pauseIcon.classList.add('hidden');
+            playIcon.classList.remove('hidden');
+        }
+
+        function resetTimer(isForBreak = false) {
+            pauseTimer();
+            isBreak = isForBreak;
+            timeRemaining = isBreak ? DEFAULT_BREAK_MINUTES * 60 : DEFAULT_WORK_MINUTES * 60;
+            timerStatus.textContent = isBreak ? "พร้อมพัก" : "พร้อมโฟกัส";
+            timerDisplay.classList.remove('animate-pulse', 'text-red-600', 'text-green-600');
+            timerDisplay.classList.add(isBreak ? 'text-green-600' : 'text-blue-700');
+            updateTimerDisplay();
+        }
+
+        function toggleTimer() {
+            if (isTimerRunning) {
+                pauseTimer();
+            } else {
+                startTimer(timeRemaining, isBreak);
+            }
+        }
 
         // --- View Templates ---
         const viewTemplates = {
             'eisenhower-view': () => {
                 const quadrants = {
-                    do: { title: 'สำคัญ / เร่งด่วน', tasks: [], color: 'red' },
-                    decide: { title: 'สำคัญ / ไม่เร่งด่วน', tasks: [], color: 'blue' },
-                    delegate: { title: 'ไม่สำคัญ / เร่งด่วน', tasks: [], color: 'yellow' },
-                    delete: { title: 'ไม่สำคัญ / ไม่เร่งด่วน', tasks: [], color: 'gray' }
+                    do: { title: 'สำคัญ / เร่งด่วน (Do)', tasks: [], color: 'red' },
+                    decide: { title: 'สำคัญ / ไม่เร่งด่วน (Decide)', tasks: [], color: 'blue' },
+                    delegate: { title: 'ไม่สำคัญ / เร่งด่วน (Delegate)', tasks: [], color: 'yellow' },
+                    delete: { title: 'ไม่สำคัญ / ไม่เร่งด่วน (Delete)', tasks: [], color: 'gray' }
                 };
 
                 Object.entries(tasks).forEach(([id, task]) => {
                     if (task.eisenhower && quadrants[task.eisenhower] && !task.isCompleted) {
+                        // Attach ID to task object for easier access in rendering
                         quadrants[task.eisenhower].tasks.push({ id, ...task });
                     }
                 });
 
+                // Sort tasks within quadrants: prioritize by due date (if available) then creation date
+                Object.values(quadrants).forEach(quadrant => {
+                    quadrant.tasks.sort((a, b) => {
+                        const dateA = a.dueDate ? new Date(a.dueDate) : new Date(a.createdAt);
+                        const dateB = b.dueDate ? new Date(b.dueDate) : new Date(b.createdAt);
+                        return dateA - dateB;
+                    });
+                });
+
                 return `
+                    <p class="text-gray-600 mb-6">เมทริกซ์ Eisenhower ช่วยให้คุณจัดลำดับความสำคัญของงานตามความเร่งด่วนและความสำคัญ</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         ${Object.entries(quadrants).map(([key, { title, tasks, color }]) => `
-                            <div class="bg-white rounded-lg shadow p-4">
-                                <h3 class="text-lg font-semibold text-${color}-600 border-b-2 border-${color}-200 pb-2 mb-4">${title}</h3>
+                            <div class="bg-white rounded-xl shadow-lg p-5 border-t-4 border-${color}-400">
+                                <h3 class="text-xl font-semibold text-${color}-600 pb-2 mb-4">${title}</h3>
                                 <div id="quadrant-${key}" class="space-y-3 min-h-[100px]">
-                                    ${tasks.length > 0 ? tasks.map(task => createTaskCard(task)).join('') : '<p class="text-gray-500 text-sm">ไม่มีงานในหมวดนี้</p>'}
+                                    ${tasks.length > 0 ? tasks.map(task => createTaskCard(task)).join('') : '<p class="text-gray-500 text-sm italic">ว่างเปล่า – งานเสร็จแล้ว หรือไม่มีงานที่ต้องเร่งด่วน</p>'}
                                 </div>
                             </div>
                         `).join('')}
@@ -324,9 +576,10 @@
             'daily-plan-view': () => `
                 <div class="bg-white rounded-lg shadow p-6">
                     <h2 class="text-2xl font-bold mb-4">แผนงานสำหรับวันนี้ (Ivy Lee)</h2>
-                    <p class="text-gray-600 mb-6">เลือก 6 งานที่สำคัญที่สุดและทำทีละอย่าง</p>
+                    <p class="text-gray-600 mb-6">หลักการ Ivy Lee: เลือก 6 งานที่สำคัญที่สุดเมื่อวานนี้ และทำทีละอย่างวันนี้</p>
                     <div id="daily-tasks-list" class="space-y-3">
-                        <p class="text-center text-gray-500">ยังไม่มีการวางแผนสำหรับวันนี้</p>
+                        <div class="p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-800 rounded">ฟีเจอร์นี้จะช่วยให้คุณเลือกงานจากเมทริกซ์มาวางแผนประจำวันได้</div>
+                        <p class="text-center text-gray-500 mt-4">ยังไม่มีการวางแผนสำหรับวันนี้</p>
                     </div>
                 </div>
             `,
@@ -335,33 +588,42 @@
                     <h2 class="text-2xl font-bold mb-4">ตัวติดตามนิสัย</h2>
                      <p class="text-gray-600 mb-6">สร้างนิสัยที่ดีด้วยความสม่ำเสมอ</p>
                     <div id="habits-list" class="space-y-4">
-                        <p class="text-center text-gray-500">ยังไม่มีนิสัยให้ติดตาม</p>
+                         <div class="p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded">การติดตามนิสัยอยู่ระหว่างการพัฒนา</div>
+                        <p class="text-center text-gray-500 mt-4">ยังไม่มีนิสัยให้ติดตาม</p>
                     </div>
                 </div>
             `,
             'calendar-view': () => `
                 <div class="bg-white rounded-lg shadow p-6">
                     <h2 class="text-2xl font-bold mb-4">ปฏิทิน / Time Blocking</h2>
-                    <p class="text-gray-600 mb-6">วางแผนเวลาของคุณเพื่อประสิทธิภาพสูงสุด</p>
-                    <div class="text-center text-gray-500">
-                        ฟีเจอร์ปฏิทินยังอยู่ในระหว่างการพัฒนา
-                    </div>
+                    <p class="text-gray-600 mb-6">วางแผนเวลาของคุณเพื่อประสิทธิภาพสูงสุดด้วยเทคนิค Time Blocking</p>
+                    <div class="p-4 bg-indigo-50 border-l-4 border-indigo-400 text-indigo-800 rounded">ตาราง Time Blocking จะถูกสร้างขึ้นที่นี่ในอนาคต</div>
+                    <div class="text-center text-gray-500 mt-4">ฟีเจอร์ปฏิทินยังอยู่ในระหว่างการพัฒนา</div>
                 </div>
             `,
             'stats-view': () => `
                 <div class="bg-white rounded-lg shadow p-6">
                     <h2 class="text-2xl font-bold mb-4">สถิติและรายงาน</h2>
+                     <p class="text-gray-600 mb-6">วิเคราะห์ว่าคุณใช้เวลาไปกับงานประเภทใดบ้าง และอัตราความสำเร็จในแต่ละวัน</p>
                      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div class="chart-container"><canvas id="tasksCompletedChart"></canvas></div>
-                        <div class="chart-container"><canvas id="pomodoroSessionsChart"></canvas></div>
+                        <div>
+                            <h3 class="text-lg font-medium mb-2">งานที่เสร็จในสัปดาห์</h3>
+                            <div class="chart-container"><canvas id="tasksCompletedChart"></canvas></div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-medium mb-2">สัดส่วนเวลาโฟกัส (Pomodoro)</h3>
+                            <div class="chart-container"><canvas id="pomodoroSessionsChart"></canvas></div>
+                        </div>
                     </div>
                 </div>
             `,
             'trash-view': () => {
-                const trashedItems = Object.entries(trash);
+                // Sort by deletion date (descending)
+                const trashedItems = Object.entries(trash).sort(([, a], [, b]) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
                 return `
                     <div class="bg-white rounded-lg shadow p-6">
                         <h2 class="text-2xl font-bold mb-4">ถังขยะ</h2>
+                        <p class="text-gray-600 mb-6">งานที่คุณลบจะถูกเก็บไว้ที่นี่ชั่วคราวเพื่อกู้คืน</p>
                         <div id="trash-list" class="space-y-3">
                              ${trashedItems.length > 0 ? trashedItems.map(([id, item]) => createTrashedItemCard(id, item)).join('') : '<p class="text-gray-500">ถังขยะว่างเปล่า</p>'}
                         </div>
@@ -371,24 +633,26 @@
             'settings-view': () => `
                 <div class="bg-white rounded-lg shadow p-6">
                     <h2 class="text-2xl font-bold mb-4">การตั้งค่า</h2>
-                    <div id="rewards-settings" class="mb-8">
-                         <h3 class="text-xl font-semibold mb-3">จัดการรางวัล</h3>
+                    <div id="rewards-settings" class="mb-8 border-b pb-6">
+                         <h3 class="text-xl font-semibold mb-3 text-green-700">จัดการรางวัล (Reward System)</h3>
+                         <p class="text-gray-600 mb-4">กำหนดรางวัลที่คุณจะได้รับหลังทำงานเสร็จสิ้น (รางวัลจะเปลี่ยนเป็นเวลาพัก)</p>
                         <div id="rewards-list" class="space-y-2 mb-4"></div>
-                        <form id="add-reward-form" class="flex items-center space-x-2">
-                            <input type="text" id="reward-name" placeholder="ชื่อรางวัล (เช่น ดูหนัง)" class="flex-grow border border-gray-300 rounded-md py-2 px-3" required>
-                            <input type="number" id="reward-duration" placeholder="นาที" class="w-24 border border-gray-300 rounded-md py-2 px-3" required>
-                            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">เพิ่ม</button>
+                        <form id="add-reward-form" class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                            <input type="text" id="reward-name" placeholder="ชื่อรางวัล (เช่น พักดื่มกาแฟ)" class="flex-grow w-full border border-gray-300 rounded-md py-2 px-3" required>
+                            <input type="number" id="reward-duration" placeholder="เวลาพัก (นาที)" class="w-full sm:w-32 border border-gray-300 rounded-md py-2 px-3" required>
+                            <button type="submit" class="w-full sm:w-auto bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">เพิ่มรางวัล</button>
                         </form>
                     </div>
                 </div>
             `,
         };
 
-        // --- Render Functions ---
+        // --- Core Functions ---
+
         function renderView(viewId) {
             views.forEach(v => v.classList.add('hidden'));
             const viewElement = document.getElementById(viewId);
-            if (viewElement) {
+            if (viewElement && viewTemplates[viewId]) {
                 viewElement.innerHTML = viewTemplates[viewId]();
                 viewElement.classList.remove('hidden');
                 // Post-render actions
@@ -398,22 +662,24 @@
         }
 
         function createTaskCard(task) {
+            const rewardName = task.rewardId && rewards[task.rewardId] ? `(${rewards[task.rewardId].name} ${rewards[task.rewardId].duration} นาที)` : '';
             return `
-                <div class="task-card border rounded-lg p-3 bg-gray-50 flex justify-between items-start" data-id="${task.id}">
-                    <div>
-                        <p class="font-semibold">${task.title}</p>
-                        <p class="text-sm text-gray-500">${task.description || ''}</p>
+                <div class="task-card border rounded-lg p-3 bg-white flex justify-between items-start" data-id="${task.id}" data-reward-id="${task.rewardId || ''}">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-gray-800 truncate">${task.title}</p>
+                        ${task.description ? `<p class="text-sm text-gray-500 truncate">${task.description}</p>` : ''}
                         ${task.dueDate ? `<p class="text-xs text-indigo-500 mt-1">กำหนดส่ง: ${task.dueDate}</p>` : ''}
+                        ${rewardName ? `<p class="text-xs text-green-600 mt-1 font-medium">รางวัล: ${rewardName}</p>` : ''}
                     </div>
                      <div class="flex items-center space-x-1 flex-shrink-0 ml-2">
                         <button class="complete-btn p-1 text-gray-400 hover:text-green-500" title="เสร็จสิ้น">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                         </button>
                         <button class="edit-btn p-1 text-gray-400 hover:text-blue-500" title="แก้ไข">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z"></path></svg>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z"></path></svg>
                         </button>
                         <button class="delete-btn p-1 text-gray-400 hover:text-red-500" title="ลบ">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
                 </div>
@@ -425,13 +691,16 @@
                 <div class="border rounded-lg p-3 bg-gray-100 flex justify-between items-center" data-id="${id}">
                     <p class="font-semibold text-gray-600">${item.title}</p>
                     <div>
-                        <button class="restore-btn bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600" data-id="${id}">กู้คืน</button>
+                        <button class="restore-btn bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">กู้คืน</button>
                     </div>
                 </div>`;
         }
 
         function renderRewardsSettings() {
             const rewardsList = document.getElementById('rewards-list');
+            // Ensure the list is empty before rendering
+            rewardsList.innerHTML = '';
+
             rewardsList.innerHTML = Object.entries(rewards).map(([id, reward]) => `
                 <div class="flex justify-between items-center bg-gray-100 p-2 rounded">
                     <span>${reward.name} (${reward.duration} นาที)</span>
@@ -439,23 +708,33 @@
                 </div>
             `).join('');
 
+            document.getElementById('add-reward-form').removeEventListener('submit', handleAddReward); // Prevent duplicate listeners
             document.getElementById('add-reward-form').addEventListener('submit', handleAddReward);
-            document.querySelectorAll('.delete-reward-btn').forEach(btn => btn.addEventListener('click', handleDeleteReward));
         }
 
         function renderCharts() {
-            // This is a placeholder for chart rendering
+            // Placeholder Data based on Eisenhower categories
+            const completedTasks = Object.values(tasks).filter(t => t.isCompleted);
+            const doCount = completedTasks.filter(t => t.eisenhower === 'do').length;
+            const decideCount = completedTasks.filter(t => t.eisenhower === 'decide').length;
+            const delegateCount = completedTasks.filter(t => t.eisenhower === 'delegate').length;
+            const deleteCount = completedTasks.filter(t => t.eisenhower === 'delete').length;
+
+            // Dummy data for weekly tasks completed
+            const weeklyData = [doCount, decideCount, delegateCount, deleteCount, Math.floor(Math.random() * 5), Math.floor(Math.random() * 5), Math.floor(Math.random() * 5)];
+
+
             const tasksCompletedCtx = document.getElementById('tasksCompletedChart')?.getContext('2d');
             if (tasksCompletedCtx) new Chart(tasksCompletedCtx, {
                 type: 'bar',
-                data: { labels: ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'], datasets: [{ label: 'งานที่เสร็จ', data: [2, 3, 1, 5, 4, 0, 1], backgroundColor: 'rgba(59, 130, 246, 0.5)' }] },
-                options: { responsive: true, maintainAspectRatio: false }
+                data: { labels: ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'], datasets: [{ label: 'งานที่เสร็จ', data: weeklyData, backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
             });
 
             const pomodoroSessionsCtx = document.getElementById('pomodoroSessionsChart')?.getContext('2d');
             if (pomodoroSessionsCtx) new Chart(pomodoroSessionsCtx, {
                 type: 'doughnut',
-                data: { labels: ['Do', 'Decide', 'Delegate', 'Delete'], datasets: [{ label: 'เวลาที่ใช้', data: [120, 80, 45, 15], backgroundColor: ['#EF4444', '#3B82F6', '#F59E0B', '#6B7280'] }] },
+                data: { labels: ['Do (สำคัญ/เร่งด่วน)', 'Decide (สำคัญ/ไม่เร่งด่วน)', 'Delegate (ไม่สำคัญ/เร่งด่วน)', 'Delete (ไม่สำคัญ/ไม่เร่งด่วน)'], datasets: [{ label: 'งานที่เสร็จตามประเภท', data: [doCount, decideCount, delegateCount, deleteCount], backgroundColor: ['#EF4444', '#3B82F6', '#F59E0B', '#6B7280'] }] },
                 options: { responsive: true, maintainAspectRatio: false }
             });
         }
@@ -463,6 +742,7 @@
 
         // --- Event Handlers ---
         function switchView(viewId) {
+            if (!userId) return; // Prevent view switching before auth is complete
             currentView = viewId;
             const link = document.querySelector(`.nav-link[data-view="${viewId}"]`);
             if (link) viewTitle.textContent = link.querySelector('span').textContent;
@@ -496,23 +776,48 @@
             taskModal.classList.add('hidden');
         }
 
+        function openActionModal(title, message) {
+            actionTitle.textContent = title;
+            actionMessage.textContent = message;
+            actionModal.classList.remove('hidden');
+        }
+
+        function closeActionModal() {
+            actionModal.classList.add('hidden');
+            // Ensure no lingering reward action listener
+            startBreakBtn.removeEventListener('click', startBreakAction);
+        }
+
+        let rewardDurationMinutes = 0;
+        const startBreakAction = () => {
+            closeActionModal();
+            // Start the break timer
+            resetTimer(true);
+            startTimer(rewardDurationMinutes * 60, true);
+        };
+
         function handleTaskFormSubmit(e) {
             e.preventDefault();
             const id = document.getElementById('task-id').value;
+            const isEditing = !!id;
+
             const taskData = {
                 title: document.getElementById('task-title').value,
                 description: document.getElementById('task-description').value,
                 dueDate: document.getElementById('task-due-date').value,
                 eisenhower: document.getElementById('task-eisenhower').value,
-                rewardId: document.getElementById('task-reward').value,
-                isCompleted: false,
-                createdAt: new Date().toISOString()
+                rewardId: document.getElementById('task-reward').value || null,
             };
 
+            if (!isEditing) {
+                taskData.isCompleted = false;
+                taskData.createdAt = new Date().toISOString();
+            }
+
             if (id) {
-                update(ref(db, `tasks/${id}`), taskData);
+                update(ref(dataRef, `tasks/${id}`), taskData);
             } else {
-                const newTaskRef = push(ref(db, 'tasks'));
+                const newTaskRef = push(ref(dataRef, 'tasks'));
                 set(newTaskRef, taskData);
             }
             closeTaskModal();
@@ -525,23 +830,62 @@
             if (!card) return;
             const taskId = card.dataset.id;
 
+            // Cleanup previous listeners before attaching new ones
+            startBreakBtn.removeEventListener('click', closeActionModal);
+            startBreakBtn.removeEventListener('click', startBreakAction);
+            startBreakBtn.classList.remove('bg-gray-200', 'text-gray-700');
+            startBreakBtn.classList.add('bg-green-600', 'text-white');
+            closeActionBtn.classList.remove('hidden');
+
             if (button.classList.contains('delete-btn')) {
                 const taskToDelete = tasks[taskId];
-                set(ref(db, `trash/${taskId}`), taskToDelete); // Move to trash
-                remove(ref(db, `tasks/${taskId}`)); // Remove from tasks
+                if (taskToDelete) {
+                    // Include deletion timestamp for trash sorting
+                    set(ref(dataRef, `trash/${taskId}`), { ...taskToDelete, deletedAt: new Date().toISOString() });
+                    remove(ref(dataRef, `tasks/${taskId}`));
+                }
             } else if (button.classList.contains('edit-btn')) {
                 openTaskModal({ id: taskId, ...tasks[taskId] });
             } else if (button.classList.contains('complete-btn')) {
-                update(ref(db, `tasks/${taskId}`), { isCompleted: true, completedAt: new Date().toISOString() });
-                // Handle reward scheduling here
+                // Update task status and add completion timestamp
+                update(ref(dataRef, `tasks/${taskId}`), { isCompleted: true, completedAt: new Date().toISOString() });
+
+                const rewardId = card.dataset.rewardId;
+                if (rewardId && rewards[rewardId]) {
+                    const reward = rewards[rewardId];
+                    rewardDurationMinutes = reward.duration;
+
+                    actionTitle.textContent = "งานเสร็จแล้ว!";
+                    actionMessage.textContent = `คุณได้รับรางวัล: ${reward.name} เป็นเวลาพัก ${reward.duration} นาที`;
+
+                    startBreakBtn.textContent = `เริ่มพัก (${reward.duration} นาที)`;
+                    startBreakBtn.classList.remove('hidden');
+
+                    startBreakBtn.addEventListener('click', startBreakAction);
+                } else {
+                    actionTitle.textContent = "เยี่ยมมาก!";
+                    actionMessage.textContent = "งานนี้เสร็จสิ้นแล้ว ไม่มีรางวัลพิเศษ";
+
+                    // Primary action button becomes the confirmation/OK button
+                    startBreakBtn.textContent = "ตกลง";
+                    startBreakBtn.classList.remove('bg-green-600', 'text-white', 'hidden');
+                    startBreakBtn.classList.add('bg-gray-200', 'text-gray-700');
+                    closeActionBtn.classList.add('hidden'); // Hide secondary close button
+
+                    startBreakBtn.addEventListener('click', closeActionModal, { once: true });
+                }
+                openActionModal(actionTitle.textContent, actionMessage.textContent);
             }
         }
 
         function handleRestoreTask(e) {
             const taskId = e.target.dataset.id;
             if (taskId && trash[taskId]) {
-                set(ref(db, `tasks/${taskId}`), trash[taskId]); // Move back to tasks
-                remove(ref(db, `trash/${taskId}`)); // Remove from trash
+                const { deletedAt, ...restoredTask } = trash[taskId]; // Remove deletion metadata
+                restoredTask.isCompleted = false; // Ensure it's active again
+
+                set(ref(dataRef, `tasks/${taskId}`), restoredTask);
+                remove(ref(dataRef, `trash/${taskId}`));
             }
         }
 
@@ -549,8 +893,8 @@
             e.preventDefault();
             const name = document.getElementById('reward-name').value;
             const duration = document.getElementById('reward-duration').value;
-            if (name && duration) {
-                const newRewardRef = push(ref(db, 'rewards'));
+            if (name && duration && dataRef) {
+                const newRewardRef = push(ref(dataRef, 'rewards'));
                 set(newRewardRef, { name, duration: parseInt(duration) });
                 e.target.reset();
             }
@@ -558,50 +902,44 @@
 
         function handleDeleteReward(e) {
             const rewardId = e.target.dataset.id;
-            if (rewardId) {
-                remove(ref(db, `rewards/${rewardId}`));
+            if (rewardId && dataRef) {
+                remove(ref(dataRef, `rewards/${rewardId}`));
             }
         }
 
-        // --- Firebase Listeners ---
-        onValue(ref(db, 'tasks'), (snapshot) => {
-            tasks = snapshot.val() || {};
-            if (document.getElementById(currentView)) renderView(currentView);
-        });
-
-        onValue(ref(db, 'rewards'), (snapshot) => {
-            rewards = snapshot.val() || {};
-            if (currentView === 'settings-view') renderRewardsSettings();
-        });
-
-        onValue(ref(db, 'trash'), (snapshot) => {
-            trash = snapshot.val() || {};
-            if (currentView === 'trash-view') renderView(currentView);
-        });
-
         // --- Initial Setup ---
+
+        // Timer Button Handlers
+        startPauseBtn.addEventListener('click', toggleTimer);
+        resetBtn.addEventListener('click', () => resetTimer(isBreak));
+
+        // Modal Handlers (Close button is always present for cancellation)
+        closeActionBtn.addEventListener('click', closeActionModal);
+
         sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('sidebar-closed'));
+
         navLinks.forEach(link => link.addEventListener('click', (e) => {
             e.preventDefault();
             switchView(e.currentTarget.dataset.view);
             if (window.innerWidth < 768) sidebar.classList.add('sidebar-closed');
         }));
+
         addTaskBtn.addEventListener('click', () => openTaskModal());
         cancelTaskBtn.addEventListener('click', closeTaskModal);
         taskForm.addEventListener('submit', handleTaskFormSubmit);
 
-        // Use event delegation for dynamic task cards
+        // Event delegation for dynamic content
         document.getElementById('eisenhower-view').addEventListener('click', handleTaskActions);
         document.getElementById('trash-view').addEventListener('click', e => {
             if (e.target.classList.contains('restore-btn')) handleRestoreTask(e);
         });
         document.getElementById('settings-view').addEventListener('click', e => {
-            if (e.target.classList.contains('delete-reward-btn')) handleDeleteReward(e);
+            const deleteBtn = e.target.closest('.delete-reward-btn');
+            if (deleteBtn) handleDeleteReward({ target: deleteBtn });
         });
 
-
-        // Initial render
-        switchView(currentView);
+        // Set initial timer state
+        resetTimer(false);
 
     </script>
 </body>
